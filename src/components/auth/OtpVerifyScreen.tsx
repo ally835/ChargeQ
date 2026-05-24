@@ -50,15 +50,20 @@ export function OtpVerifyScreen({ phone, onSuccess, onBack }: OtpVerifyScreenPro
 
       <OtpInput
         value={digits}
-        onChange={(d) => { setDigits(d); clearError() }}
+        onChange={(d) => {
+          setDigits(d)
+          // Only clear the error when the user is actually typing a digit,
+          // not when OtpInput programmatically resets all boxes on error
+          if (d.some(Boolean)) clearError()
+        }}
         onComplete={handleComplete}
         hasError={!!error}
         disabled={loading}
       />
 
       {error && (
-        <div style={{ textAlign: 'center', fontSize: 12, color: '#F7C1C1', marginBottom: 12 }}>
-          {error}
+        <div style={{ textAlign: 'center', fontSize: 13, color: '#F7C1C1', marginBottom: 12, lineHeight: 1.4 }}>
+          Incorrect code — please try again or resend.
         </div>
       )}
 

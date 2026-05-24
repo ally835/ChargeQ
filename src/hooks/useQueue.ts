@@ -130,6 +130,7 @@ export function useQueueRealtime(siteId: string) {
   const updateMyStatus = useQueueStore((s) => s.updateMyStatus)
   const setAdminQueue = useQueueStore((s) => s.setAdminQueue)
   const setRealtimeConnected = useQueueStore((s) => s.setRealtimeConnected)
+  const setRealtimeStatus = useQueueStore((s) => s.setRealtimeStatus)
   const user = useAuthStore((s) => s.user)
   const toast = useToast()
 
@@ -227,11 +228,18 @@ export function useQueueRealtime(siteId: string) {
       )
       .subscribe((status) => {
         setRealtimeConnected(status === 'SUBSCRIBED')
+        setRealtimeStatus(
+          status === 'SUBSCRIBED'    ? 'connected'  :
+          status === 'TIMED_OUT'     ? 'timeout'    :
+          status === 'CHANNEL_ERROR' ? 'error'      :
+          'connecting'
+        )
       })
 
     return () => {
       supabase.removeChannel(channel)
       setRealtimeConnected(false)
+      setRealtimeStatus('connecting')
     }
   }, [siteId]) // eslint-disable-line react-hooks/exhaustive-deps
 

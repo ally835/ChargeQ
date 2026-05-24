@@ -9,7 +9,7 @@ interface PhoneLandingScreenProps {
 export function PhoneLandingScreen({ onOtpSent, onAdminHubOpen }: PhoneLandingScreenProps) {
   const [phone, setPhone] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
-  const { sendOTP, loading, error } = useSendOTP()
+  const { sendOTP, loading, error, clearError } = useSendOTP()
   const { startTimer } = useResendTimer()
 
   useEffect(() => {
@@ -189,7 +189,7 @@ export function PhoneLandingScreen({ onOtpSent, onAdminHubOpen }: PhoneLandingSc
             placeholder="04XX XXX XXX"
             autoComplete="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => { setPhone(e.target.value); if (error) clearError() }}
             onKeyDown={(e) => { if (e.key === 'Enter') handleContinue() }}
             style={{
               width: '100%', height: 54, padding: '0 16px',
@@ -200,7 +200,7 @@ export function PhoneLandingScreen({ onOtpSent, onAdminHubOpen }: PhoneLandingSc
               letterSpacing: '0.05em', outline: 'none',
               transition: 'border-color 0.2s, box-shadow 0.2s',
             }}
-            onFocus={(e) => { e.target.style.borderColor = 'var(--g)'; e.target.style.boxShadow = '0 0 0 3px rgba(29,158,117,0.15)' }}
+            onFocus={(e) => { if (!error) { e.target.style.borderColor = 'var(--g)'; e.target.style.boxShadow = '0 0 0 3px rgba(29,158,117,0.15)' } }}
             onBlur={(e) => { e.target.style.borderColor = error ? 'var(--r)' : 'rgba(29,158,117,0.35)'; e.target.style.boxShadow = '' }}
           />
           {error && (

@@ -24,12 +24,14 @@ interface QueueState {
 
   // Realtime connection status
   isRealtimeConnected: boolean
+  realtimeStatus: 'connecting' | 'connected' | 'error' | 'timeout'
 
   // Actions (mutations go through hooks/API layer, not directly here)
   setMyEntry: (entry: MyQueueEntry | null) => void
   setAdminQueue: (queue: QueueEntry[]) => void
   setBays: (bays: Bay[]) => void
   setRealtimeConnected: (connected: boolean) => void
+  setRealtimeStatus: (status: 'connecting' | 'connected' | 'error' | 'timeout') => void
 
   // Optimistic update for position when realtime event arrives
   updateMyPosition: (position: number, estimatedWaitMins: number) => void
@@ -44,11 +46,13 @@ export const useQueueStore = create<QueueState>()((set, get) => ({
   adminQueue: [],
   bays: [],
   isRealtimeConnected: false,
+  realtimeStatus: 'connecting',
 
   setMyEntry: (myEntry) => set({ myEntry }),
   setAdminQueue: (adminQueue) => set({ adminQueue }),
   setBays: (bays) => set({ bays }),
   setRealtimeConnected: (isRealtimeConnected) => set({ isRealtimeConnected }),
+  setRealtimeStatus: (realtimeStatus) => set({ realtimeStatus }),
 
   updateMyPosition: (position, estimatedWaitMins) => {
     const { myEntry } = get()

@@ -163,6 +163,7 @@ export default function AdminSettingsPage() {
   const setPendingManagerCount = useAppStore((s) => s.setPendingManagerCount)
   const navigate = useNavigate()
   const isRealtimeConnected = useQueueStore((s) => s.isRealtimeConnected)
+  const realtimeStatus = useQueueStore((s) => s.realtimeStatus)
   const toast = useToast()
 
   const [managers, setManagers] = useState<PendingManager[]>([])
@@ -365,7 +366,12 @@ export default function AdminSettingsPage() {
         <div className="section-label">System status</div>
         <StatusRow ok label="Supabase backend" val="Connected" />
         <StatusRow ok label="SMS (Twilio)" val="Live via Supabase Auth" />
-        <StatusRow ok={isRealtimeConnected} label="Realtime (queue + bays)" val={isRealtimeConnected ? 'Subscribed ✓' : 'Connecting...'} />
+        <StatusRow ok={isRealtimeConnected} label="Realtime (queue + bays)" val={
+          isRealtimeConnected   ? 'Subscribed ✓'       :
+          realtimeStatus === 'error'   ? 'Connection error'  :
+          realtimeStatus === 'timeout' ? 'Timed out — retrying' :
+          'Connecting...'
+        } />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', fontSize: 13 }}>
           <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--g)', flexShrink: 0 }} />
           <div style={{ flex: 1, color: 'var(--mint)' }}>Queue engine</div>

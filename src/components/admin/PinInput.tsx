@@ -29,17 +29,7 @@ export function PinInput({
   useEffect(() => {
     if (hasError) {
       onChange(Array(length).fill(''))
-      setTimeout(() => {
-        inputRefs.current.forEach((el) => {
-          if (el) { el.style.borderColor = 'var(--r)'; el.style.boxShadow = '0 0 0 3px rgba(226,75,74,0.12)' }
-        })
-        setTimeout(() => {
-          inputRefs.current.forEach((el) => {
-            if (el) { el.style.borderColor = ''; el.style.boxShadow = '' }
-          })
-          inputRefs.current[0]?.focus()
-        }, 900)
-      }, 50)
+      setTimeout(() => inputRefs.current[0]?.focus(), 50)
     }
   }, [hasError]) // eslint-disable-line
 
@@ -82,15 +72,25 @@ export function PinInput({
           style={{
             width: size, height: size,
             background: value[idx] ? 'var(--gc)' : 'var(--bg3)',
-            border: `1.5px solid ${value[idx] ? 'var(--g)' : 'rgba(29,158,117,0.2)'}`,
+            border: `1.5px solid ${hasError && !value[idx] ? 'var(--r)' : value[idx] ? 'var(--g)' : 'rgba(29,158,117,0.2)'}`,
             borderRadius: 10, color: 'var(--cream)',
             fontFamily: 'Syne, sans-serif', fontSize, fontWeight: 700,
             textAlign: 'center', outline: 'none',
             transition: 'border-color 0.2s, box-shadow 0.2s',
             caretColor: 'var(--g)',
           } as React.CSSProperties}
-          onFocus={(e) => { e.target.style.borderColor = 'var(--g)'; e.target.style.boxShadow = '0 0 0 3px rgba(29,158,117,0.12)' }}
-          onBlur={(e) => { if (!value[idx]) e.target.style.borderColor = 'rgba(29,158,117,0.2)'; e.target.style.boxShadow = '' }}
+          onFocus={(e) => {
+            if (!hasError) {
+              e.target.style.borderColor = 'var(--g)'
+              e.target.style.boxShadow = '0 0 0 3px rgba(29,158,117,0.12)'
+            } else {
+              e.target.style.boxShadow = '0 0 0 3px rgba(226,75,74,0.12)'
+            }
+          }}
+          onBlur={(e) => {
+            e.target.style.boxShadow = ''
+            if (!value[idx]) e.target.style.borderColor = hasError ? 'var(--r)' : 'rgba(29,158,117,0.2)'
+          }}
         />
       ))}
     </div>

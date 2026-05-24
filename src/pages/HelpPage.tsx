@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/appStore'
 import { AdminPinOverlay } from '@/components/admin/AdminPinOverlay'
 import { SiteManagerLoginOverlay } from '@/components/admin/SiteManagerLoginOverlay'
+import { FeedbackModal } from '@/components/finder/FeedbackModal'
 import { useSuperAdminLogin } from '@/hooks/useAdmin'
 
 type AdminFlow = 'none' | 'hub' | 'superadmin-pin' | 'manager-login'
@@ -14,6 +15,7 @@ export default function HelpPage() {
   const [flow, setFlow] = useState<AdminFlow>('none')
 
   const { verifySuperAdminPin, loading: saLoading, error: saError, clearError: clearSaError } = useSuperAdminLogin()
+  const [showFeedback, setShowFeedback] = useState(false)
 
   async function handleSAPin(pin: string) {
     const ok = await verifySuperAdminPin(pin)
@@ -104,6 +106,20 @@ export default function HelpPage() {
           <a href="https://chargeq.com.au" style={{ fontSize: 11, color: 'var(--g)' }}>chargeq.com.au</a>
         </div>
 
+        {/* Feedback */}
+        <div style={{ textAlign: 'center', padding: '4px 0 4px' }}>
+          <button
+            onClick={() => setShowFeedback(true)}
+            style={{
+              background: 'none', border: 'none', color: 'var(--mint)',
+              fontSize: 12, cursor: 'pointer', fontFamily: '"DM Sans", sans-serif',
+              padding: '8px 16px', borderRadius: 6, transition: 'color 0.2s',
+            }}
+          >
+            💬 Share feedback
+          </button>
+        </div>
+
         {/* Admin entry */}
         <div style={{ textAlign: 'center', padding: '4px 0 16px' }}>
           <button
@@ -157,6 +173,9 @@ export default function HelpPage() {
           </div>
         </div>
       )}
+
+      {/* Feedback modal */}
+      {showFeedback && <FeedbackModal onClose={() => setShowFeedback(false)} />}
 
       {/* Super admin PIN */}
       {flow === 'superadmin-pin' && (

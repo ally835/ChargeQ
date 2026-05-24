@@ -56,8 +56,8 @@ export default function AdminBaysPage() {
               <div
                 key={bay.num}
                 style={{
-                  background: isOcc ? 'var(--rl)' : isFault ? 'var(--al)' : 'var(--gl)',
-                  border: `0.5px solid ${isOcc ? 'var(--rb)' : isFault ? 'var(--ab)' : 'var(--gb)'}`,
+                  background: isOcc ? 'rgba(226,75,74,0.18)' : isFault ? 'var(--al)' : 'var(--gl)',
+                  border: `2px solid ${isOcc ? 'var(--rb)' : isFault ? 'var(--ab)' : 'var(--gb)'}`,
                   borderRadius: 'var(--rads)', padding: '12px 10px',
                 }}
               >

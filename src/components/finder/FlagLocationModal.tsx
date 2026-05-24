@@ -22,7 +22,6 @@ export function FlagLocationModal({ stationName, lat, lng, onClose }: FlagLocati
   const [reason, setReason] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
   const user = useAuthStore((s) => s.user)
   const toast = useToast()
 
@@ -48,7 +47,8 @@ export function FlagLocationModal({ stationName, lat, lng, onClose }: FlagLocati
       return
     }
 
-    setSubmitted(true)
+    toast("Flag submitted — thanks! We'll follow up with the site.")
+    onClose()
   }
 
   return (
@@ -134,52 +134,25 @@ export function FlagLocationModal({ stationName, lat, lng, onClose }: FlagLocati
           We'll reach out to the site owner on your behalf.
         </div>
 
-        {submitted ? (
-          <div style={{
-            background: 'rgba(29,158,117,0.12)', border: '1px solid rgba(29,158,117,0.4)',
-            borderRadius: 'var(--rads)', padding: '16px', textAlign: 'center', marginBottom: 8,
-          }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>✅</div>
-            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 15, fontWeight: 700, color: 'var(--cream)', marginBottom: 4 }}>
-              Flag submitted!
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--mint)', lineHeight: 1.5, marginBottom: 12 }}>
-              Thanks — we'll reach out to <strong>{stationName}</strong> about installing ChargeQ.
-            </div>
-            <button
-              onClick={onClose}
-              style={{
-                width: '100%', height: 44, background: 'var(--g)', color: '#fff',
-                border: 'none', borderRadius: 'var(--rads)',
-                fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 700, cursor: 'pointer',
-              }}
-            >
-              Done
-            </button>
-          </div>
-        ) : (
-          <>
-            <button
-              onClick={handleSubmit}
-              disabled={!reason || loading}
-              style={{
-                width: '100%', height: 48,
-                background: reason ? 'var(--r)' : 'rgba(226,75,74,0.3)',
-                color: '#fff', border: 'none',
-                borderRadius: 'var(--rads)',
-                fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 700,
-                cursor: reason ? 'pointer' : 'not-allowed', marginBottom: 8,
-                opacity: loading ? 0.7 : 1,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              }}
-            >
-              {loading ? 'Submitting...' : '🚩 Submit flag'}
-            </button>
-            <button className="btn-secondary" onClick={onClose} style={{ height: 40, fontSize: 13 }}>
-              Cancel
-            </button>
-          </>
-        )}
+        <button
+          onClick={handleSubmit}
+          disabled={!reason || loading}
+          style={{
+            width: '100%', height: 48,
+            background: reason ? 'var(--r)' : 'rgba(226,75,74,0.3)',
+            color: '#fff', border: 'none',
+            borderRadius: 'var(--rads)',
+            fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 700,
+            cursor: reason ? 'pointer' : 'not-allowed', marginBottom: 8,
+            opacity: loading ? 0.7 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          {loading ? 'Submitting...' : '🚩 Submit flag'}
+        </button>
+        <button className="btn-secondary" onClick={onClose} style={{ height: 40, fontSize: 13 }}>
+          Cancel
+        </button>
       </div>
     </div>
   )

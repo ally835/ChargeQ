@@ -201,6 +201,12 @@ export default function AdminReportsPage() {
                 >
                   {actioning === f.id ? '...' : '✓ Mark actioned'}
                 </button>
+                <a
+                  href={`mailto:hello@chargeq.com.au?subject=Site%20outreach%3A%20${encodeURIComponent(f.station_name)}&body=Hi%2C%0A%0AWe%20received%20a%20flag%20for%20${encodeURIComponent(f.station_name)}%20(${encodeURIComponent(f.reason)}).%0A%0A`}
+                  style={{ ...btnBase, background: 'rgba(29,158,117,0.1)', color: 'var(--mint)', border: '0.5px solid rgba(29,158,117,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                >
+                  ✉ Contact site
+                </a>
                 <button
                   onClick={() => handleDelete(f.id, f.station_name)}
                   disabled={deleting === f.id}

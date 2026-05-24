@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAppStore } from '@/store/appStore'
 import { useQueueStore } from '@/store/queueStore'
-import { useAdminBayReady, useAdminRemoveFromQueue, useAdminNotifySMS } from '@/hooks/useAdmin'
+import { useAdminBayReady, useAdminRemoveFromQueue, useAdminNotifySMS, useAdminSimulateArrival } from '@/hooks/useAdmin'
 import { useQueueRealtime } from '@/hooks/useQueue'
 import { AdminBadge } from '@/components/admin/AdminBadge'
 import { CHARGER_INFO } from '@/utils'
@@ -14,6 +14,7 @@ export default function AdminQueuePage() {
   const { markBayReady } = useAdminBayReady()
   const { removeFromQueue } = useAdminRemoveFromQueue()
   const { notifyDriver } = useAdminNotifySMS()
+  const { simulateArrival } = useAdminSimulateArrival()
   useQueueRealtime(siteKey)
 
   const occ = bays.filter((b) => b.status === 'occupied').length
@@ -60,6 +61,18 @@ export default function AdminQueuePage() {
           />
         ))
       )}
+      <button
+        onClick={simulateArrival}
+        style={{
+          width: '100%', marginTop: 8, height: 38, borderRadius: 8,
+          background: 'var(--bg3)', border: '0.5px dashed rgba(29,158,117,0.4)',
+          color: 'var(--teal)', fontFamily: '"DM Sans", sans-serif',
+          fontSize: 12, fontWeight: 500, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}
+      >
+        + Simulate new arrival
+      </button>
     </div>
   )
 }

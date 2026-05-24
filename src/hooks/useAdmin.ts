@@ -283,6 +283,38 @@ export function useAdminSetBayStatus() {
   return { setBayStatus }
 }
 
+// ── Admin: simulate a new queue arrival (dev/testing) ────────────────
+
+export function useAdminSimulateArrival() {
+  const siteKey = useAppStore((s) => s.siteKey)
+  const siteInfo = useAppStore((s) => s.siteInfo)
+  const toast = useToast()
+
+  async function simulateArrival(): Promise<void> {
+    const n = Math.floor(1000 + Math.random() * 9000)
+    const { data, error } = await supabase.rpc('join_queue', {
+      p_site_id:   siteKey,
+      p_site_name: siteInfo.name,
+      p_name:      `Test Driver ${n}`,
+      p_phone:     '+61400000000',
+      p_plate:     `SIM${n}`,
+      p_charger:   'ccs2',
+      p_port_side: 'rr',
+      p_is_remote: false,
+      p_user_id:   null,
+    })
+
+    if (error || !data) {
+      toast('Simulate failed — check bay availability.')
+      return
+    }
+
+    toast(`Simulated arrival: SIM${n} → position ${data.position}`)
+  }
+
+  return { simulateArrival }
+}
+
 // ── Admin: remove from queue ──────────────────────────────────────────
 
 export function useAdminRemoveFromQueue() {
