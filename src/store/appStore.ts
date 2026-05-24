@@ -45,6 +45,10 @@ interface AppState {
   adminSessionManagerId: string | null
   setAdminSessionManagerId: (id: string | null) => void
 
+  // Pending manager count — drives badge on Settings tab
+  pendingManagerCount: number
+  setPendingManagerCount: (n: number) => void
+
   // Toast queue
   toasts: Toast[]
   showToast: (message: string) => void
@@ -71,6 +75,9 @@ export const useAppStore = create<AppState>()((set) => {
 
     adminSessionManagerId: null,
     setAdminSessionManagerId: (id) => set({ adminSessionManagerId: id }),
+
+    pendingManagerCount: 0,
+    setPendingManagerCount: (n) => set({ pendingManagerCount: n }),
 
     toasts: [],
     showToast: (message) => {

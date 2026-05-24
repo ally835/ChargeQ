@@ -160,6 +160,7 @@ export default function AdminSettingsPage() {
   const siteInfo = useAppStore((s) => s.siteInfo)
   const appMode = useAppStore((s) => s.appMode)
   const setAppMode = useAppStore((s) => s.setAppMode)
+  const setPendingManagerCount = useAppStore((s) => s.setPendingManagerCount)
   const navigate = useNavigate()
   const isRealtimeConnected = useQueueStore((s) => s.isRealtimeConnected)
   const toast = useToast()
@@ -185,7 +186,11 @@ export default function AdminSettingsPage() {
     if (error) { toast('Could not load managers — SA session may have expired.'); return }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = data as any
-    if (result?.managers) setManagers(result.managers as PendingManager[])
+    if (result?.managers) {
+      const list = result.managers as PendingManager[]
+      setManagers(list)
+      setPendingManagerCount(list.filter((m) => m.status === 'pending').length)
+    }
   }
 
   async function handleSuspend(manager: PendingManager) {
@@ -213,6 +218,7 @@ export default function AdminSettingsPage() {
 
   function handleLockOut() {
     clearSuperAdminPin()
+    setPendingManagerCount(0)
     setAppMode('user')
     navigate('/')
   }
@@ -224,6 +230,30 @@ export default function AdminSettingsPage() {
   return (
     <div style={{ padding: '14px 16px' }}>
       <AdminBadge icon={isSuperAdmin ? '⬡' : '⚙️'} label={isSuperAdmin ? 'Super Admin — System Console' : 'Admin — Settings & System'} />
+
+      {/* ── Pending approvals banner ── */}
+      {isSuperAdmin && pending.length > 0 && (
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(239,159,39,0.18) 0%, rgba(239,159,39,0.08) 100%)',
+          border: '1px solid var(--ab)',
+          borderLeft: '4px solid var(--a)',
+          borderRadius: 'var(--rads)',
+          padding: '12px 14px',
+          marginBottom: 10,
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{ fontSize: 20, flexShrink: 0 }}>⏳</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 700, color: 'var(--amber-t)', marginBottom: 2 }}>
+              {pending.length} pending approval{pending.length > 1 ? 's' : ''}
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(239,159,39,0.7)', lineHeight: 1.5 }}>
+              {pending.map((m) => m.name).join(', ')} — review below
+            </div>
+          </div>
+          <div style={{ fontSize: 16, color: 'var(--a)', flexShrink: 0 }}>↓</div>
+        </div>
+      )}
 
       {/* ── SUPER ADMIN: Pending approvals ── */}
       {isSuperAdmin && (

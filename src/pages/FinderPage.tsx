@@ -54,6 +54,14 @@ function markerFor(station: StationPoi) {
 
 // ── Map re-center helper component ────────────────────────────────────
 
+function InvalidateSize() {
+  const map = useMap()
+  useEffect(() => {
+    setTimeout(() => map.invalidateSize(), 100)
+  }, [map])
+  return null
+}
+
 function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
   const map = useMap()
   useEffect(() => { map.setView([lat, lng], 14, { animate: true }) }, [lat, lng, map])
@@ -172,6 +180,7 @@ export default function FinderPage() {
             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           />
+          <InvalidateSize />
           <RecenterMap lat={centerLoc.lat} lng={centerLoc.lng} />
 
           {/* User location */}

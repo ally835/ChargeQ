@@ -54,6 +54,7 @@ export function NavTabs() {
   const navigate = useNavigate()
   const location = useLocation()
   const appMode = useAppStore((s) => s.appMode)
+  const pendingManagerCount = useAppStore((s) => s.pendingManagerCount)
 
   // ── CRITICAL: Admin tabs only render when authenticated as admin ──
   // appMode is 'user' by default and only changes after PIN verification
@@ -67,6 +68,7 @@ export function NavTabs() {
       }}>
         {ADMIN_TABS.map((tab) => {
           const active = location.pathname === tab.path
+          const showBadge = tab.path === '/admin/settings' && pendingManagerCount > 0
           return (
             <button
               key={tab.path}
@@ -83,6 +85,14 @@ export function NavTabs() {
               }}
             >
               {tab.label}
+              {showBadge && (
+                <span style={{
+                  position: 'absolute', top: 6, right: 'calc(50% - 14px)',
+                  width: 7, height: 7, borderRadius: '50%',
+                  background: '#E24B4A',
+                  boxShadow: '0 0 0 1.5px rgba(13,32,24,0.95)',
+                }} />
+              )}
               {active && (
                 <span style={{
                   position: 'absolute', bottom: 0,

@@ -21,7 +21,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const FOUNDER_EMAIL = 'founder@chargeq.com.au'
+const FOUNDER_EMAIL = 'hello@chargeq.com.au'
 const FROM_EMAIL    = 'noreply@chargeq.com.au'  // Must be a verified Resend domain
 
 serve(async (req: Request) => {
@@ -136,7 +136,7 @@ serve(async (req: Request) => {
       <p style="font-size: 14px; color: #444; line-height: 1.6;">
         Log in to the ChargeQ admin panel to review this request, approve the manager, and set their initial PIN.
       </p>
-      <a href="https://app.chargeq.com.au" class="action">Open ChargeQ Admin →</a>
+      <a href="https://chargeq.net" class="action">Open ChargeQ Admin →</a>
     </div>
     <div class="footer">
       This email was sent automatically by ChargeQ. Do not reply to this email.
