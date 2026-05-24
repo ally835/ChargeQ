@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ChargeQ CSS variables — preserved verbatim from V2 */
+:root {
+  --bg:      #091510;
+  --bg2:     #0d2018;
+  --bg3:     #112a1e;
+  --surf:    #0f2318;
+  --surf2:   #152e22;
+  --g:       #1D9E75;
+  --gd:      #085041;
+  --gm:      #0F6E56;
+  --gl:      rgba(29,158,117,0.15);
+  --gb:      rgba(29,158,117,0.25);
+  --gc:      rgba(29,158,117,0.08);
+  --a:       #EF9F27;
+  --al:      rgba(239,159,39,0.12);
+  --ab:      rgba(239,159,39,0.35);
+  --r:       #E24B4A;
+  --rl:      rgba(226,75,74,0.12);
+  --rb:      rgba(226,75,74,0.35);
+  --b:       #378ADD;
+  --bl:      rgba(55,138,221,0.12);
+  --cream:   #f0efe8;
+  --mint:    #9FE1CB;
+  --teal:    #5DCAA5;
+  --text2:   rgba(240,239,232,0.6);
+  --text3:   rgba(240,239,232,0.35);
+  --amber-t: #FAC775;
+  --rad:     16px;
+  --rads:    10px;
+  --safe-b:  env(safe-area-inset-bottom, 0px);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%; width: 100%;
+  background: var(--bg);
+  color: var(--cream);
+  font-family: "DM Sans", sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root { height: 100%; width: 100%; }
+
+@keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+@keyframes slideSheet { from{transform:translateY(100%)} to{transform:translateY(0)} }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes pulseDot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.cq-spinner { width:24px;height:24px;border:2px solid rgba(29,158,117,0.2);border-top-color:var(--g);border-radius:50%;animation:spin .8s linear infinite; }
+
+/* ── Shared button styles ── */
+.btn-primary {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; height: 52px; margin-top: 12px;
+  background: var(--g); color: #fff;
+  border: none; border-radius: var(--rad);
+  font-family: "Syne", sans-serif; font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(29,158,117,0.3);
+  letter-spacing: 0.01em;
+}
+.btn-primary:hover { background: var(--gm); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(29,158,117,0.4); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.btn-secondary {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 44px; margin-top: 8px;
+  background: transparent; color: var(--text2);
+  border: 0.5px solid rgba(29,158,117,0.2); border-radius: var(--rad);
+  font-family: "DM Sans", sans-serif; font-size: 14px; font-weight: 400;
+  cursor: pointer; transition: all 0.2s;
+}
+.btn-secondary:hover { border-color: rgba(29,158,117,0.4); color: var(--cream); }
+
+/* ── Shared card ── */
+.cq-card {
+  background: var(--bg2);
+  border: 0.5px solid rgba(29,158,117,0.15);
+  border-radius: var(--rad);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+/* ── Section label ── */
+.section-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--teal);
+  margin-bottom: 10px;
+}
+
+/* App shell layout */
+.cq-app {
+  height: 100dvh;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.cq-app::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(29,158,117,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(29,158,117,0.05) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  z-index: 0;
+}
