@@ -45,12 +45,31 @@ export function useSuperAdminLogin() {
     setError(null)
     setLoading(true)
 
-    const { data, error: rpcErr } = await supabase.rpc('verify_admin_pin', { attempt: pin })
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), 10_000)
+    )
+
+    let data: boolean | null = null
+    let rpcErr: unknown = null
+    try {
+      const result = await Promise.race([
+        supabase.rpc('verify_admin_pin', { attempt: pin }),
+        timeout,
+      ]) as Awaited<ReturnType<typeof supabase.rpc<boolean>>>
+      data = result.data as boolean | null
+      rpcErr = result.error
+    } catch (e) {
+      rpcErr = e
+      console.error('verify_admin_pin error:', e)
+    }
 
     setLoading(false)
 
     if (rpcErr || data !== true) {
-      setError('Incorrect PIN. Please try again.')
+      setError(rpcErr instanceof Error && rpcErr.message === 'timeout'
+        ? 'Connection timed out. Check your network and try again.'
+        : 'Incorrect PIN. Please try again.'
+      )
       return false
     }
 
