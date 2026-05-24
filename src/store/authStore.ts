@@ -47,7 +47,13 @@ export const useAuthStore = create<AuthState>()(
       },
 
       refreshUser: async () => {
-        const { data: { user: authUser } } = await supabase.auth.getUser()
+        const { data: { user: authUser }, error } = await supabase.auth.getUser()
+        if (error) {
+          // Stale or revoked refresh token — clear it so the user gets a clean login screen
+          await supabase.auth.signOut()
+          set({ user: null, isAuthenticated: false, isLoading: false })
+          return false
+        }
         if (!authUser) {
           set({ user: null, isAuthenticated: false, isLoading: false })
           return false

@@ -147,8 +147,9 @@ export default function QueuePage() {
       setScreen('s-setup')
       return
     }
-    // Returning user — wait briefly for auth state to propagate then auto-join
-    await new Promise((r) => setTimeout(r, 400))
+    // Explicitly refresh user profile (don't rely on onAuthStateChange + timeout)
+    const { refreshUser } = useAuthStore.getState()
+    await refreshUser()
     const { user: currentUser } = useAuthStore.getState()
     await attemptAutoJoin(currentUser)
   }

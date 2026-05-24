@@ -19,7 +19,14 @@ export function AuthInitializer() {
     // 2. Subscribe to auth state changes (sign-in, sign-out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_OUT' || !session) {
+        if (event === 'SIGNED_OUT' || (event as string) === 'TOKEN_REFRESH_ERROR') {
+          // Clear any stale session so the user sees a clean login screen
+          if ((event as string) === 'TOKEN_REFRESH_ERROR') await supabase.auth.signOut()
+          setUser(null)
+          setLoading(false)
+          return
+        }
+        if (!session) {
           setUser(null)
           return
         }
