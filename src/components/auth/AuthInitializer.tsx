@@ -13,6 +13,10 @@ export function AuthInitializer() {
   const refreshUser = useAuthStore((s) => s.refreshUser)
 
   useEffect(() => {
+    // Purge any legacy storage keys from older app versions
+    localStorage.removeItem('chargeq_token')
+    localStorage.removeItem('chargeq_user')
+
     // 1. Check existing session immediately
     refreshUser()
 
