@@ -102,16 +102,18 @@ export default function AdminReportsPage() {
 
   async function handleMarkActioned(id: string) {
     setActioning(id)
-    const { error } = await supabase.from('location_flags').update({ actioned: true }).eq('id', id)
-    if (!error) setFlags((prev) => prev.map((f) => f.id === id ? { ...f, actioned: true } : f))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any).rpc('mark_flag_actioned', { p_flag_id: id })
+    if (data) setFlags((prev) => prev.map((f) => f.id === id ? { ...f, actioned: true } : f))
     setActioning(null)
   }
 
   async function handleDelete(id: string, name: string) {
     if (!window.confirm(`Delete flag for "${name}"? This cannot be undone.`)) return
     setDeleting(id)
-    const { error } = await supabase.from('location_flags').delete().eq('id', id)
-    if (!error) setFlags((prev) => prev.filter((f) => f.id !== id))
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any).rpc('delete_location_flag', { p_flag_id: id })
+    if (data) setFlags((prev) => prev.filter((f) => f.id !== id))
     setDeleting(null)
   }
 
