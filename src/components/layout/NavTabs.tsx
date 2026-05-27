@@ -47,7 +47,15 @@ const ADMIN_TABS = [
   { path: '/admin/queue',    label: 'Queue' },
   { path: '/admin/bays',     label: 'Bays' },
   { path: '/admin/reports',  label: 'Reports' },
+  { path: '/admin/ads',      label: 'Ads' },
   { path: '/admin/settings', label: 'Settings' },
+]
+
+const SA_TABS = [
+  { path: '/admin/queue',     label: 'Sites' },
+  { path: '/admin/approvals', label: 'Approvals' },
+  { path: '/admin/reports',   label: 'Reports' },
+  { path: '/admin/settings',  label: 'Settings' },
 ]
 
 export function NavTabs() {
@@ -59,6 +67,7 @@ export function NavTabs() {
   // ── CRITICAL: Admin tabs only render when authenticated as admin ──
   // appMode is 'user' by default and only changes after PIN verification
   if (appMode === 'admin' || appMode === 'superadmin') {
+    const tabs = appMode === 'superadmin' ? SA_TABS : ADMIN_TABS
     return (
       <nav style={{
         flexShrink: 0, display: 'flex',
@@ -66,13 +75,13 @@ export function NavTabs() {
         borderBottom: '0.5px solid rgba(239,159,39,0.2)',
         position: 'relative', zIndex: 10,
       }}>
-        {ADMIN_TABS.map((tab) => {
+        {tabs.map((tab) => {
           const active = location.pathname === tab.path
-          const showBadge = tab.path === '/admin/settings' && pendingManagerCount > 0
+          const showBadge = appMode === 'superadmin' && tab.path === '/admin/approvals' && pendingManagerCount > 0
           return (
             <button
               key={tab.path}
-              onClick={() => navigate(tab.path)}
+              onClick={() => navigate(tab.path + location.search)}
               style={{
                 flex: 1, display: 'flex', flexDirection: 'column',
                 alignItems: 'center', justifyContent: 'center',
@@ -120,7 +129,7 @@ export function NavTabs() {
         return (
           <button
             key={tab.path}
-            onClick={() => navigate(tab.path)}
+            onClick={() => navigate(tab.path + location.search)}
             style={{
               flex: 1, display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center',

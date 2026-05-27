@@ -8,7 +8,7 @@ import { StationCard } from '@/components/finder/StationCard'
 import { StationDetailPanel } from '@/components/finder/StationDetailPanel'
 
 // ── Fix Leaflet default icon path (Vite build issue) ─────────────────
-delete (L.Icon.Default.prototype as Record<string,unknown>)._getIconUrl
+delete (L.Icon.Default.prototype as unknown as Record<string,unknown>)._getIconUrl
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
   iconUrl:       'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
@@ -62,30 +62,38 @@ function InvalidateSize() {
   return null
 }
 
-function RecenterMap({ lat, lng }: { lat: number; lng: number }) {
+function RecenterMap({ lat, lng, sheetOffsetPx }: { lat: number; lng: number; sheetOffsetPx: number }) {
   const map = useMap()
-  useEffect(() => { map.setView([lat, lng], 14, { animate: true }) }, [lat, lng, map])
+  useEffect(() => {
+    const zoom = 14
+    // Shift the view center south so the user's pin appears centred in the
+    // visible area above the bottom sheet, not behind it.
+    const userPx = map.project([lat, lng], zoom)
+    const adjustedPx = userPx.add(L.point(0, sheetOffsetPx / 2))
+    const adjustedCenter = map.unproject(adjustedPx, zoom)
+    map.setView(adjustedCenter, zoom, { animate: true })
+  }, [lat, lng, map, sheetOffsetPx])
   return null
 }
 
 // ── Filter types ──────────────────────────────────────────────────────
 
-type Filter = 'best' | 'open' | 'fast' | 'cq'
+type FilterId = 'open' | 'fast' | 'cq'
 
-const FILTERS: { id: Filter; label: string }[] = [
+const FILTERS: { id: FilterId | 'best'; label: string }[] = [
   { id: 'best', label: 'Best match' },
   { id: 'open', label: 'Open now' },
   { id: 'fast', label: 'Fast' },
   { id: 'cq',   label: 'ChargeQ only' },
 ]
 
-function applyFilter(stations: StationPoi[], filter: Filter): StationPoi[] {
-  switch (filter) {
-    case 'open': return stations.filter((s) => s.isOpen)
-    case 'fast': return stations.filter((s) => s.isFast)
-    case 'cq':   return stations.filter((s) => s.isChargeQ)
-    default:     return stations
-  }
+// Open + Fast are combinable; CQ is exclusive.
+function applyFilter(stations: StationPoi[], active: Set<FilterId>): StationPoi[] {
+  if (active.has('cq')) return stations.filter((s) => s.isChargeQ)
+  let result = stations
+  if (active.has('open')) result = result.filter((s) => s.isOpen)
+  if (active.has('fast')) result = result.filter((s) => s.isFast)
+  return result
 }
 
 // ── Bottom sheet snap states ──────────────────────────────────────────
@@ -98,10 +106,13 @@ export default function FinderPage() {
   const [userLoc, setUserLoc] = useState(SYDNEY_FALLBACK)
   const [centerLoc, setCenterLoc] = useState(SYDNEY_FALLBACK)
   const [locating, setLocating] = useState(true)
+  const [recentering, setRecentering] = useState(false)
+  const [recenterKey, setRecenterKey] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [joinedIds, setJoinedIds] = useState<Set<string>>(new Set())
-  const [filter, setFilter] = useState<Filter>('best')
+  const [activeFilters, setActiveFilters] = useState<Set<FilterId>>(new Set())
   const [snap, setSnap] = useState<SheetSnap>('half')
+  const [showOcmInfo, setShowOcmInfo] = useState(false)
   const { stations, loading, error, fetchStations } = useOcmStations()
 
   // Bottom sheet drag
@@ -122,25 +133,43 @@ export default function FinderPage() {
     return () => { cancelled = true }
   }, [fetchStations])
 
-  const filtered = applyFilter(stations, filter)
-  const selectedStation = stations.find((s) => s.id === selectedId) ?? stations.find((s) => s.pid === selectedId)
+  const filtered = applyFilter(stations, activeFilters)
+  const selectedStation = stations.find((s) => s.pid === selectedId)
 
-  function handleMarkerClick(station: StationPoi) {
+  const handleMarkerClick = useCallback((station: StationPoi) => {
     setSelectedId(station.pid)
     setSnap('half')
+  }, [])
+
+  const handleCardClick = useCallback((station: StationPoi) => {
+    setSelectedId((prev) => prev === station.pid ? null : station.pid)
+  }, [])
+
+  const handleJoined = useCallback(() => {
+    if (selectedId) setJoinedIds((ids) => new Set([...ids, selectedId]))
+  }, [selectedId])
+
+  function toggleFilter(id: FilterId | 'best') {
+    if (id === 'best') { setActiveFilters(new Set()); return }
+    setActiveFilters((prev) => {
+      const next = new Set(prev)
+      if (id === 'cq') {
+        next.has('cq') ? next.delete('cq') : (next.clear(), next.add('cq'))
+      } else {
+        next.has(id) ? next.delete(id) : (next.delete('cq'), next.add(id))
+      }
+      return next
+    })
   }
 
-  function handleCardClick(station: StationPoi) {
-    setSelectedId(station.pid === selectedId ? null : station.pid)
-  }
-
-  function handleJoined() {
-    if (selectedId) setJoinedIds((prev) => new Set([...prev, selectedId]))
-  }
-
-  function handleRecenter() {
-    setCenterLoc({ ...userLoc, _t: Date.now() } as typeof userLoc)
-    fetchStations(userLoc.lat, userLoc.lng)
+  async function handleRecenter() {
+    setRecentering(true)
+    const loc = await getUserLocation()
+    setUserLoc(loc)
+    setCenterLoc(loc)
+    setRecenterKey((k) => k + 1)
+    fetchStations(loc.lat, loc.lng)
+    setRecentering(false)
   }
 
   // Drag handlers for bottom sheet
@@ -181,7 +210,12 @@ export default function FinderPage() {
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
           />
           <InvalidateSize />
-          <RecenterMap lat={centerLoc.lat} lng={centerLoc.lng} />
+          <RecenterMap
+            key={recenterKey}
+            lat={centerLoc.lat}
+            lng={centerLoc.lng}
+            sheetOffsetPx={snap === 'peek' ? 72 : snap === 'half' ? window.innerHeight * 0.45 : window.innerHeight * 0.80}
+          />
 
           {/* User location */}
           {!locating && (
@@ -213,18 +247,23 @@ export default function FinderPage() {
       {/* Recenter FAB */}
       <button
         onClick={handleRecenter}
+        disabled={recentering}
         style={{
           position: 'absolute', right: 14, top: 14, zIndex: 500,
           width: 40, height: 40, borderRadius: '50%',
           background: 'rgba(9,21,16,0.85)', color: 'var(--cream)',
-          border: '0.5px solid rgba(29,158,117,0.3)',
-          cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: `0.5px solid ${recentering ? 'var(--g)' : 'rgba(29,158,117,0.3)'}`,
+          cursor: recentering ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 18, backdropFilter: 'blur(8px)',
           boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
         }}
-        title="Recenter on me"
+        title="Find my location"
       >
-        ⌖
+        {recentering
+          ? <span className="cq-spinner" style={{ width: 16, height: 16, borderWidth: 2, borderTopColor: 'var(--g)' }} />
+          : '⌖'
+        }
       </button>
 
       {/* Bottom sheet */}
@@ -244,60 +283,106 @@ export default function FinderPage() {
       >
         {/* Handle — drag target */}
         <div
-          style={{ flexShrink: 0, padding: '8px 0 0', cursor: 'grab', touchAction: 'none' }}
+          style={{
+            flexShrink: 0,
+            padding: snap === 'peek' ? '0' : '10px 16px 2px',
+            cursor: 'pointer', touchAction: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'relative',
+            minHeight: snap === 'peek' ? '72px' : 'auto',
+          }}
           onTouchStart={onSheetDragStart}
           onTouchEnd={onSheetDragEnd}
           onMouseDown={onSheetDragStart}
           onMouseUp={onSheetDragEnd}
-          onClick={() => setSnap(snap === 'peek' ? 'half' : snap === 'half' ? 'full' : 'peek')}
+          onClick={() => { if (snap === 'peek') setSnap('half') }}
         >
-          <div style={{ width: 38, height: 4, background: 'rgba(240,239,232,0.25)', borderRadius: 2, margin: '0 auto 6px' }} />
+          {snap === 'peek' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, pointerEvents: 'none' }}>
+              <div style={{ width: 38, height: 4, background: 'rgba(240,239,232,0.25)', borderRadius: 2 }} />
+              <div style={{ fontSize: 12, color: 'var(--mint)', fontFamily: '"DM Sans", sans-serif', display: 'flex', alignItems: 'center', gap: 5 }}>
+                Nearby stations <span style={{ fontSize: 10 }}>↑</span>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div style={{ width: 38, height: 4, background: 'rgba(240,239,232,0.25)', borderRadius: 2 }} />
+              <div
+                onTouchEnd={(e) => { e.stopPropagation(); setSnap('peek') }}
+                onClick={(e) => { e.stopPropagation(); setSnap('peek') }}
+                style={{
+                  position: 'absolute', right: 16,
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: 'rgba(240,239,232,0.08)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', color: 'rgba(240,239,232,0.6)', fontSize: 16,
+                }}
+                title="Collapse"
+              >
+                ↓
+              </div>
+            </>
+          )}
         </div>
 
         {/* Sheet header */}
         <div style={{ flexShrink: 0, padding: '4px 16px 10px' }}>
           <div style={{
             fontFamily: 'Syne, sans-serif', fontSize: 19, fontWeight: 800,
-            color: 'var(--cream)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8,
+            color: 'var(--cream)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: showOcmInfo ? 6 : 8,
           }}>
             Charging stations
             <span
-              onClick={() => alert('Live data from Open Charge Map. Tap a pin or card for details.')}
+              onClick={() => setShowOcmInfo((v) => !v)}
               style={{
                 width: 16, height: 16, borderRadius: '50%',
-                border: '1px solid rgba(240,239,232,0.4)', color: 'rgba(240,239,232,0.6)',
+                border: `1px solid ${showOcmInfo ? 'var(--g)' : 'rgba(240,239,232,0.4)'}`,
+                color: showOcmInfo ? 'var(--g)' : 'rgba(240,239,232,0.6)',
                 fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer',
               }}
             >i</span>
           </div>
+          {showOcmInfo && (
+            <div style={{
+              fontSize: 12, color: 'var(--mint)', lineHeight: 1.55,
+              background: 'var(--gc)', borderRadius: 'var(--rads)',
+              padding: '7px 10px', marginBottom: 8,
+              borderLeft: '2px solid var(--g)',
+            }}>
+              Live data from Open Charge Map. Tap a pin or card for details.
+            </div>
+          )}
 
           {/* Filter chips */}
           <div style={{
             display: 'flex', gap: 8, overflowX: 'auto', padding: '4px 0 6px',
             scrollbarWidth: 'none',
           }}>
-            {FILTERS.map((f) => (
-              <button
-                key={f.id}
-                onClick={() => setFilter(f.id)}
-                style={{
-                  flexShrink: 0,
-                  padding: '7px 14px',
-                  background: filter === f.id ? 'var(--b)' : 'rgba(240,239,232,0.08)',
-                  color: filter === f.id ? '#fff' : 'rgba(240,239,232,0.7)',
-                  border: `0.5px solid ${filter === f.id ? 'var(--b)' : 'transparent'}`,
-                  borderRadius: 18,
-                  fontSize: 13, fontWeight: 500, cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  whiteSpace: 'nowrap',
-                  transition: 'background 0.15s, color 0.15s',
-                  fontFamily: '"DM Sans", sans-serif',
-                }}
-              >
-                {f.label}
-              </button>
-            ))}
+            {FILTERS.map((f) => {
+              const isActive = f.id === 'best' ? activeFilters.size === 0 : activeFilters.has(f.id as FilterId)
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => toggleFilter(f.id)}
+                  style={{
+                    flexShrink: 0,
+                    padding: '7px 14px',
+                    background: isActive ? 'var(--b)' : 'rgba(240,239,232,0.08)',
+                    color: isActive ? '#fff' : 'rgba(240,239,232,0.7)',
+                    border: `0.5px solid ${isActive ? 'var(--b)' : 'transparent'}`,
+                    borderRadius: 18,
+                    fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    whiteSpace: 'nowrap',
+                    transition: 'background 0.15s, color 0.15s',
+                    fontFamily: '"DM Sans", sans-serif',
+                  }}
+                >
+                  {f.label}
+                </button>
+              )
+            })}
           </div>
         </div>
 

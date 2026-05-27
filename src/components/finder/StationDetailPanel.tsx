@@ -52,14 +52,15 @@ export function StationDetailPanel({ station, isJoined, onJoined, onClose }: Sta
 
     setJoining(false)
 
-    if (error || !data || data.error) {
-      toast(data?.error === 'already_in_queue'
+    const result = data as { error?: string; position?: number } | null
+    if (error || !result || result.error) {
+      toast(result?.error === 'already_in_queue'
         ? "You're already in the queue at this station."
         : 'Could not join queue. Please try again.')
       return
     }
 
-    toast(`Queue position #${data.position} secured at ${station.name}! We'll SMS you when ready. ⚡`)
+    toast(`Queue position #${result.position} secured at ${station.name}! We'll SMS you when ready. ⚡`)
     onJoined()
   }
 

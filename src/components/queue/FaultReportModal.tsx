@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
 import { useAppStore, useToast } from '@/store/appStore'
+import { sendSMS } from '@/lib/sms'
 
 type FaultType = 'not-charging' | 'display-broken' | 'vandalism' | 'cable-missing' | 'blocked' | 'other'
 
@@ -39,6 +40,7 @@ export function FaultReportModal({ defaultBayNum, onClose }: FaultReportModalPro
 
   const user = useAuthStore((s) => s.user)
   const siteKey = useAppStore((s) => s.siteKey)
+  const siteInfo = useAppStore((s) => s.siteInfo)
   const toast = useToast()
 
   function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
@@ -67,6 +69,17 @@ export function FaultReportModal({ defaultBayNum, onClose }: FaultReportModalPro
     if (error) {
       toast('Could not submit report. Please try again.')
       return
+    }
+
+    // Notify the site manager by SMS
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: mobile } = await (supabase as any).rpc('get_site_manager_mobile', { p_site_id: siteKey })
+    if (mobile) {
+      const bayLabel = bayNum ? ` (Bay ${bayNum})` : ''
+      await sendSMS(
+        mobile as string,
+        `ChargeQ alert: Fault reported at ${siteInfo.name}${bayLabel} — ${FAULT_LABELS[faultType]}. Check the Reports tab.`,
+      )
     }
 
     toast('Fault report submitted. Site operator has been notified. ⚠️')

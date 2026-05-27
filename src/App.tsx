@@ -14,6 +14,8 @@ import AdminQueuePage from '@/pages/AdminQueuePage'
 import AdminBaysPage from '@/pages/AdminBaysPage'
 import AdminReportsPage from '@/pages/AdminReportsPage'
 import AdminSettingsPage from '@/pages/AdminSettingsPage'
+import AdminApprovalsPage from '@/pages/AdminApprovalsPage'
+import AdminAdsPage from '@/pages/AdminAdsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,10 +48,12 @@ function AppRoutes() {
             <Route path="/" element={<QueuePage />} />
             <Route path="/finder" element={<FinderPage />} />
             <Route path="/help" element={<HelpPage />} />
-            <Route path="/admin/queue"    element={<AdminGuard><AdminQueuePage /></AdminGuard>} />
-            <Route path="/admin/bays"     element={<AdminGuard><AdminBaysPage /></AdminGuard>} />
-            <Route path="/admin/reports"  element={<AdminGuard><AdminReportsPage /></AdminGuard>} />
-            <Route path="/admin/settings" element={<AdminGuard><AdminSettingsPage /></AdminGuard>} />
+            <Route path="/admin/queue"     element={<AdminGuard><AdminQueuePage /></AdminGuard>} />
+            <Route path="/admin/bays"      element={<AdminGuard><AdminBaysPage /></AdminGuard>} />
+            <Route path="/admin/reports"   element={<AdminGuard><AdminReportsPage /></AdminGuard>} />
+            <Route path="/admin/ads"       element={<AdminGuard><AdminAdsPage /></AdminGuard>} />
+            <Route path="/admin/approvals" element={<AdminGuard><AdminApprovalsPage /></AdminGuard>} />
+            <Route path="/admin/settings"  element={<AdminGuard><AdminSettingsPage /></AdminGuard>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AppShell>

@@ -9,6 +9,7 @@ interface FeedbackModalProps {
 
 export function FeedbackModal({ onClose }: FeedbackModalProps) {
   const [rating, setRating] = useState(0)
+  const [ratingError, setRatingError] = useState(false)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const user = useAuthStore((s) => s.user)
@@ -16,7 +17,7 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
   const toast = useToast()
 
   async function handleSubmit() {
-    if (!rating) return
+    if (!rating) { setRatingError(true); return }
     setLoading(true)
 
     const { error } = await supabase.from('feedback').insert({
@@ -68,11 +69,11 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
           How was your experience with ChargeQ today?
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 18 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: ratingError ? 6 : 18 }}>
           {[1, 2, 3, 4, 5].map((star) => (
             <button
               key={star}
-              onClick={() => setRating(star)}
+              onClick={() => { setRating(star); setRatingError(false) }}
               style={{
                 background: 'none', border: 'none', cursor: 'pointer',
                 fontSize: 36, padding: 2, lineHeight: 1,
@@ -85,6 +86,15 @@ export function FeedbackModal({ onClose }: FeedbackModalProps) {
             </button>
           ))}
         </div>
+
+        {ratingError && (
+          <div style={{
+            textAlign: 'center', fontSize: 12, color: '#F7C1C1',
+            marginBottom: 12, lineHeight: 1.4,
+          }}>
+            Please select a star rating before submitting.
+          </div>
+        )}
 
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: 'block', fontSize: 12, color: 'var(--mint)', marginBottom: 6 }}>

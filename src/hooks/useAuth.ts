@@ -3,7 +3,7 @@ import { supabase, normalizePhone } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
 import { useToast } from '@/store/appStore'
 import { isValidAuMobile } from '@/utils'
-import type { ChargerType } from '@/types'
+import type { ChargerType, PortSide, Vehicle } from '@/types'
 
 // ── Send OTP ──────────────────────────────────────────────────────────
 
@@ -210,10 +210,10 @@ export function useAddVehicle() {
     plate: string
     nick: string
     charger: ChargerType
-    portSide?: string
-  }): Promise<boolean> {
+    portSide?: PortSide
+  }): Promise<Vehicle | null> {
     const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) return false
+    if (!authUser) return null
 
     setLoading(true)
 
@@ -228,7 +228,7 @@ export function useAddVehicle() {
     if (existing) {
       setLoading(false)
       toast('This plate is already in your garage.')
-      return false
+      return null
     }
 
     const { data, error } = await supabase
@@ -238,25 +238,27 @@ export function useAddVehicle() {
         plate: params.plate.trim().toUpperCase(),
         nick: params.nick.trim() || params.plate.trim().toUpperCase(),
         charger: params.charger,
-        port_side: params.portSide || null,
+        port_side: params.portSide ?? null,
         is_default: false,
       })
       .select()
       .single()
 
     setLoading(false)
-    if (error || !data) return false
+    if (error || !data) return null
 
-    addVehicle({
+    const vehicle: Vehicle = {
       id: data.id,
       plate: data.plate,
       nick: data.nick,
       charger: data.charger as ChargerType,
+      portSide: (data.port_side as PortSide) ?? undefined,
       isDefault: false,
-    })
+    }
 
+    addVehicle(vehicle)
     toast(`${data.nick} added to your garage ✓`)
-    return true
+    return vehicle
   }
 
   return { addVehicleToAccount, loading }

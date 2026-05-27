@@ -68,7 +68,8 @@ export async function rpc<T>(
   fn: string,
   args: Record<string, unknown>
 ): Promise<T> {
-  const { data, error } = await supabase.rpc(fn, args)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc(fn, args)
   if (error) throw new Error(`RPC ${fn} failed: ${error.message}`)
   return data as T
 }

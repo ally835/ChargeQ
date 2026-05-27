@@ -93,7 +93,6 @@ export function OtpInput({
           style={{
             width: 44,
             height: 52,
-            background: 'var(--bg3)',
             border: `1.5px solid ${
               hasError
                 ? 'var(--r)'

@@ -55,8 +55,8 @@ export function useSuperAdminLogin() {
       const result = await Promise.race([
         supabase.rpc('verify_admin_pin', { attempt: pin }),
         timeout,
-      ]) as Awaited<ReturnType<typeof supabase.rpc<boolean>>>
-      data = result.data as boolean | null
+      ]) as { data: boolean | null; error: unknown }
+      data = result.data
       rpcErr = result.error
     } catch (e) {
       rpcErr = e
@@ -194,31 +194,30 @@ export function useAdminBayReady() {
   async function markBayReady(
     entryId:    string,
     driverName: string,
-    phone?:     string,
-    bayNum?:    number | null,
+    phone:      string,
+    bayNum:     number,
   ): Promise<boolean> {
     setLoading(true)
-    const { data } = await supabase.rpc('admin_mark_bay_ready', {
+    const { data } = await (supabase as any).rpc('sm_assign_bay', {
       p_site_id:  siteKey,
       p_entry_id: entryId,
+      p_bay_num:  bayNum,
     })
     setLoading(false)
 
     if (!data) {
-      toast('Could not mark bay ready. Please try again.')
+      toast('Could not assign bay — driver may have left the queue.')
       return false
     }
 
-    // Send SMS notification to driver
     if (phone) {
-      const bayLabel = bayNum ? ` Bay ${bayNum}` : ''
       await sendSMS(
         phone,
-        `ChargeQ: Your EV charging bay is ready!${bayLabel} at ${siteInfo.name}. You have 5 minutes before your spot is released. Head there now.`,
+        `ChargeQ: Bay ${bayNum} is ready for you at ${siteInfo.name}. Head there now — you have 5 minutes before your spot is released.`,
       )
-      toast(`Bay freed — ${driverName} has been notified by SMS 📱`)
+      toast(`Bay ${bayNum} assigned — ${driverName} notified by SMS 📱`)
     } else {
-      toast(`Bay freed — ${driverName} marked ready (no phone on file)`)
+      toast(`Bay ${bayNum} assigned to ${driverName} (no phone on file)`)
     }
 
     return true
@@ -261,7 +260,7 @@ export function useAdminSetBayStatus() {
 
   async function setBayStatus(
     bayNum: number,
-    status: 'free' | 'occupied',
+    status: 'free' | 'occupied' | 'fault',
     plate?: string
   ): Promise<boolean> {
     const { data } = await supabase.rpc('set_bay_status', {
@@ -276,7 +275,8 @@ export function useAdminSetBayStatus() {
       return false
     }
 
-    toast(`Bay ${bayNum} marked as ${status === 'free' ? 'available ✓' : 'occupied'}`)
+    const label = status === 'free' ? 'available ✓' : status === 'fault' ? 'maintenance ✓' : 'occupied'
+    toast(`Bay ${bayNum} marked as ${label}`)
     return true
   }
 
@@ -291,28 +291,68 @@ export function useAdminSimulateArrival() {
   const toast = useToast()
 
   async function simulateArrival(): Promise<void> {
-    const n = Math.floor(1000 + Math.random() * 9000)
-    const { data, error } = await supabase.rpc('join_queue', {
+    const bays = useQueueStore.getState().bays
+    const charger = bays.find((b) => b.status === 'free')?.type
+      ?? bays[0]?.type
+      ?? 'type2'
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any).rpc('admin_simulate_arrival', {
       p_site_id:   siteKey,
       p_site_name: siteInfo.name,
-      p_name:      `Test Driver ${n}`,
-      p_phone:     '+61400000000',
-      p_plate:     `SIM${n}`,
-      p_charger:   'ccs2',
-      p_port_side: 'rr',
-      p_is_remote: false,
-      p_user_id:   null,
+      p_charger:   charger,
     })
 
-    if (error || !data) {
-      toast('Simulate failed — check bay availability.')
+    if (error) { toast('Simulate failed — network error.'); return }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = data as any
+    if (!result || result.error) {
+      const reason = result?.error === 'no_compatible_bay'
+        ? 'no compatible bay type for this site'
+        : result?.error ?? 'unknown error'
+      toast(`Simulate failed — ${reason}`)
       return
     }
 
-    toast(`Simulated arrival: SIM${n} → position ${data.position}`)
+    const { plate, position, bay_num: bayNum, entry_id: entryId } = result
+
+    if (!bayNum) {
+      // No free bay — vehicle joins queue and waits
+      toast(`Sim ${plate} → #${position} in queue (no free bay)`)
+      return
+    }
+
+    toast(`Sim ${plate} → #${position}, assigned Bay ${bayNum}`)
+
+    // After 4s: driver "arrives" — mark bay occupied, entry left
+    setTimeout(async () => {
+      await supabase.rpc('set_bay_status', {
+        p_site_id: siteKey, p_bay_num: bayNum, p_status: 'occupied', p_plate: plate,
+      })
+      await supabase.rpc('leave_queue', { p_entry_id: entryId })
+      toast(`Sim ${plate} now charging at Bay ${bayNum}`)
+
+      // After 25s more: driver leaves — free the bay
+      setTimeout(async () => {
+        await supabase.rpc('set_bay_status', {
+          p_site_id: siteKey,
+          p_bay_num: bayNum,
+          p_status:  'free',
+          p_plate:   null,
+        })
+        toast(`Bay ${bayNum} free — sim cycle complete`)
+      }, 25_000)
+    }, 4_000)
   }
 
-  return { simulateArrival }
+  async function clearSimEntries(): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).rpc('clear_sim_entries', { p_site_id: siteKey })
+    toast('Test vehicles cleared from queue')
+  }
+
+  return { simulateArrival, clearSimEntries }
 }
 
 // ── Admin: remove from queue ──────────────────────────────────────────

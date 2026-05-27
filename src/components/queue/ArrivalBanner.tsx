@@ -5,10 +5,11 @@ const ARRIVAL_WINDOW_SECS = 300 // 5 minutes
 interface ArrivalBannerProps {
   bayNum: number | null
   onConfirm: () => void
-  onSkip: () => void
+  onSkip: () => void      // manual "I can't make it"
+  onExpired: () => void   // countdown hit zero
 }
 
-export function ArrivalBanner({ bayNum, onConfirm, onSkip }: ArrivalBannerProps) {
+export function ArrivalBanner({ bayNum, onConfirm, onSkip, onExpired }: ArrivalBannerProps) {
   const [secsLeft, setSecsLeft] = useState(ARRIVAL_WINDOW_SECS)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -17,7 +18,7 @@ export function ArrivalBanner({ bayNum, onConfirm, onSkip }: ArrivalBannerProps)
       setSecsLeft((s) => {
         if (s <= 1) {
           clearInterval(timerRef.current!)
-          onSkip() // time expired — auto-skip
+          onExpired() // countdown hit zero — distinct from manual skip
           return 0
         }
         return s - 1

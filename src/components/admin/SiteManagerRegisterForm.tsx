@@ -120,11 +120,10 @@ export function SiteManagerRegisterForm({ onBack, onSubmitted }: SiteManagerRegi
       return
     }
 
-    // Show submitted state for 1.2s then go to confirmation
     setSubmitted(true)
     window.setTimeout(() => {
       onSubmitted()
-    }, 1200)
+    }, 2500)
   }
 
   function focusStyle(e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) {

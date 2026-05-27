@@ -10,12 +10,13 @@ import type { ChargerType, PortSide, QueueEntry, MyQueueEntry } from '@/types'
 export function useJoinQueue() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const user = useAuthStore((s) => s.user)
   const siteInfo = useAppStore((s) => s.siteInfo)
   const setMyEntry = useQueueStore((s) => s.setMyEntry)
   const toast = useToast()
 
   async function joinQueue(charger: ChargerType, portSide: PortSide, plateOverride?: string): Promise<boolean> {
+    // Read user fresh from store — avoids stale closure after post-OTP refreshUser
+    const user = useAuthStore.getState().user
     if (!user) { setError('Please sign in first'); return false }
 
     const vehicle = user.vehicles.find((v) => v.id === user.selectedVehicleId) ?? user.vehicles[0]
@@ -26,7 +27,7 @@ export function useJoinQueue() {
     setLoading(true)
 
     const { data: { user: authUser } } = await supabase.auth.getUser()
-    const { data, error: rpcErr } = await supabase.rpc('join_queue', {
+    const { data: rawData, error: rpcErr } = await supabase.rpc('join_queue', {
       p_site_id:   siteInfo.key,
       p_site_name: siteInfo.name,
       p_name:      user.name,
@@ -57,6 +58,8 @@ export function useJoinQueue() {
       return false
     }
 
+    const data = rawData as { error?: string; entry_id?: string; bay_num?: number | null; position?: number; estimated_wait_mins?: number } | null
+
     if (!data) {
       setError('Could not join the queue. Please try again.')
       return false
@@ -73,14 +76,15 @@ export function useJoinQueue() {
     }
 
     const entry: MyQueueEntry = {
-      id:                  data.entry_id,
+      id:                  data.entry_id ?? '',
       siteId:              siteInfo.key,
       siteName:            siteInfo.name,
       plate:               plate,
       charger,
-      bayNum:              data.bay_num,
-      position:            data.position,
-      estimatedWaitMins:   data.estimated_wait_mins,
+      portSide,
+      bayNum:              data.bay_num ?? null,
+      position:            data.position ?? 0,
+      estimatedWaitMins:   data.estimated_wait_mins ?? 0,
       status:              'waiting',
     }
 
@@ -144,7 +148,7 @@ export function useQueueRealtime(siteId: string) {
       .from('queue_entries')
       .select('*')
       .eq('site_id', siteId)
-      .in('status', ['waiting', 'ready'])
+      .eq('status', 'waiting')
       .order('position')
 
     if (data) {
@@ -187,6 +191,10 @@ export function useQueueRealtime(siteId: string) {
       if (data.status !== myEntryRef.current.status || data.position !== myEntryRef.current.position) {
         updateMyPosition(data.position, data.estimated_wait_mins)
         updateMyStatus(data.status as MyQueueEntry['status'], data.bay_num ?? undefined)
+      }
+      // Restore portSide from DB if missing (e.g. after page reload)
+      if (!myEntryRef.current.portSide && data.port_side) {
+        setMyEntry({ ...myEntryRef.current, portSide: data.port_side as PortSide })
       }
     }
 

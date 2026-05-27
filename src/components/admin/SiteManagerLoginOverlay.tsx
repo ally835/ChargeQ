@@ -1,17 +1,18 @@
 import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { PinInput } from './PinInput'
 import { useSiteManagerLogin } from '@/hooks/useAdmin'
 import { isValidEmail } from '@/utils'
 import { SiteManagerRegisterForm } from './SiteManagerRegisterForm'
-import { RegistrationSubmittedScreen } from './RegistrationSubmittedScreen'
 
 interface SiteManagerLoginOverlayProps {
   onClose: () => void
 }
 
-type View = 'login' | 'register' | 'submitted'
+type View = 'login' | 'register'
 
 export function SiteManagerLoginOverlay({ onClose }: SiteManagerLoginOverlayProps) {
+  const navigate = useNavigate()
   const [view, setView] = useState<View>('login')
   const [email, setEmail] = useState('')
   const [emailErr, setEmailErr] = useState('')
@@ -31,13 +32,9 @@ export function SiteManagerLoginOverlay({ onClose }: SiteManagerLoginOverlayProp
     return (
       <SiteManagerRegisterForm
         onBack={() => setView('login')}
-        onSubmitted={() => setView('submitted')}
+        onSubmitted={onClose}
       />
     )
-  }
-
-  if (view === 'submitted') {
-    return <RegistrationSubmittedScreen onClose={onClose} />
   }
 
   // ── Login view ────────────────────────────────────────────────────
@@ -67,14 +64,16 @@ export function SiteManagerLoginOverlay({ onClose }: SiteManagerLoginOverlayProp
   }
 
   async function handlePinComplete(code: string) {
-    await verifyPin(code)
+    const ok = await verifyPin(code)
+    if (ok) { onClose(); navigate('/admin/queue') }
   }
 
   async function handleChangePinSubmit() {
     if (!/^\d{4}$/.test(newPin1)) { setChangePinErr('PIN must be exactly 4 digits.'); return }
     if (newPin1 !== newPin2) { setChangePinErr('PINs do not match.'); return }
     setChangePinErr('')
-    await changePin('', newPin1)
+    const ok = await changePin('', newPin1)
+    if (ok) { onClose(); navigate('/admin/queue') }
   }
 
   return (

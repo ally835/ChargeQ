@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/store/authStore'
 import { useAppStore, useToast } from '@/store/appStore'
+import { sendSMS } from '@/lib/sms'
 
 interface BayTakenModalProps {
   assignedBay: number | null
@@ -9,12 +10,21 @@ interface BayTakenModalProps {
   onReported: () => void
 }
 
+const INCIDENT_TYPES: { id: string; icon: string; label: string }[] = [
+  { id: 'non-ev',       icon: '🚗', label: 'Non-EV vehicle' },
+  { id: 'ev-no-queue',  icon: '⚡', label: 'EV, not in queue' },
+  { id: 'blocked',      icon: '🚧', label: 'Bay blocked' },
+  { id: 'other',        icon: '❓', label: 'Other' },
+]
+
 export function BayTakenModal({ assignedBay, onClose, onReported }: BayTakenModalProps) {
   const [plate, setPlate] = useState('')
   const [notes, setNotes] = useState('')
+  const [incidentType, setIncidentType] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const user = useAuthStore((s) => s.user)
   const siteKey = useAppStore((s) => s.siteKey)
+  const siteInfo = useAppStore((s) => s.siteInfo)
   const toast = useToast()
 
   async function handleSubmit() {
@@ -25,12 +35,26 @@ export function BayTakenModal({ assignedBay, onClose, onReported }: BayTakenModa
       offender_plate: plate.trim().toUpperCase() || null,
       notes:          notes.trim() || null,
       reported_by:    user?.id ?? null,
-    })
+      fault_type:     incidentType ?? null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any)
     setLoading(false)
 
     if (error) {
       toast('Could not submit report. Please try again.')
       return
+    }
+
+    // Notify the site manager by SMS
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: mobile } = await (supabase as any).rpc('get_site_manager_mobile', { p_site_id: siteKey })
+    if (mobile) {
+      const plateLabel = plate.trim() ? ` by ${plate.trim().toUpperCase()}` : ''
+      const typeLabel  = incidentType ? ` (${incidentType})` : ''
+      await sendSMS(
+        mobile as string,
+        `ChargeQ alert: Bay ${assignedBay ?? '?'} taken${plateLabel}${typeLabel} at ${siteInfo.name}. Driver moved to position 1.`,
+      )
     }
 
     toast('Report submitted. You\'ve been moved to position 1. 🚀')
@@ -86,6 +110,32 @@ export function BayTakenModal({ assignedBay, onClose, onReported }: BayTakenModa
           <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--cream)' }}>
             {assignedBay != null ? `Bay ${assignedBay}` : 'Unknown'}
           </span>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: 'block', fontSize: 12, color: 'var(--mint)', marginBottom: 8 }}>
+            What type of incident? <span style={{ color: 'var(--text3)' }}>(optional)</span>
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+            {INCIDENT_TYPES.map((t) => {
+              const sel = incidentType === t.id
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setIncidentType(sel ? null : t.id)}
+                  style={{
+                    height: 38, borderRadius: 8, border: `1px solid ${sel ? 'var(--r)' : 'rgba(29,158,117,0.2)'}`,
+                    background: sel ? 'rgba(226,75,74,0.15)' : 'var(--bg3)',
+                    color: sel ? '#F7C1C1' : 'var(--mint)',
+                    fontSize: 12, fontFamily: '"DM Sans", sans-serif',
+                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  {t.icon} {t.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         <div style={{ marginBottom: 14 }}>

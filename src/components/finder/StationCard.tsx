@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { StationPoi } from '@/hooks/useOcm'
 import { formatDistance, estimatedDriveMins, availabilityLabel } from '@/hooks/useOcm'
 
@@ -8,7 +9,7 @@ interface StationCardProps {
   onClick: () => void
 }
 
-export function StationCard({ station, isSelected, isJoined, onClick }: StationCardProps) {
+export const StationCard = memo(function StationCard({ station, isSelected, isJoined, onClick }: StationCardProps) {
   const avail = availabilityLabel(station)
   const driveMins = estimatedDriveMins(station.distanceKm)
 
@@ -146,4 +147,4 @@ export function StationCard({ station, isSelected, isJoined, onClick }: StationC
       </div>
     </div>
   )
-}
+})

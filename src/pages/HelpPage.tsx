@@ -193,7 +193,6 @@ export default function HelpPage() {
       {flow === 'manager-login' && (
         <SiteManagerLoginOverlay
           onClose={() => setFlow('none')}
-          onRegister={() => setFlow('none')}
         />
       )}
     </>

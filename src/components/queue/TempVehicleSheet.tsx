@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { CHARGER_INFO } from '@/utils'
+import { CHARGER_INFO, PORT_INFO } from '@/utils'
 import type { ChargerType, PortSide, Vehicle } from '@/types'
 import { useToast } from '@/store/appStore'
 import { PortSelector } from './PortSelector'
@@ -48,16 +48,17 @@ export function TempVehicleSheet({ onConfirm, onClose }: TempVehicleSheetProps) 
     const { data, error } = await supabase
       .rpc('lookup_plate', { p_plate: cleanPlate })
 
-    const row = Array.isArray(data) ? data[0] : data
+    const rawRow = Array.isArray(data) ? data[0] : data
+    const row = rawRow as { charger?: string; port_side?: string | null; nick?: string } | null
 
     if (!error && row && row.charger) {
       setFoundVehicle({
         charger: row.charger as ChargerType,
-        portSide: row.port_side as PortSide | null,
+        portSide: (row.port_side as PortSide) ?? null,
         nick: row.nick ?? cleanPlate,
       })
       setCharger(row.charger as ChargerType)
-      setPortSide(row.port_side as PortSide | null)
+      setPortSide((row.port_side as PortSide) ?? null)
       setLookupState('found')
     } else {
       setLookupState('not-found')

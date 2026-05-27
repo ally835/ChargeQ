@@ -173,7 +173,7 @@ export function WelcomeDashboard({
       </button>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '16px 0 8px' }}>
         <div style={{ flex: 1, height: '0.5px', background: 'rgba(29,158,117,0.2)' }} />
-        <div style={{ fontSize: 10, color: 'var(--teal)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>My account</div>
+        <div style={{ fontSize: 10, color: 'var(--teal)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>My Garage</div>
         <div style={{ flex: 1, height: '0.5px', background: 'rgba(29,158,117,0.2)' }} />
       </div>
 
@@ -201,14 +201,14 @@ export function WelcomeDashboard({
               fontFamily: '"DM Sans", sans-serif',
             }}
           >
-            Manage ›
+            My Garage ›
           </button>
         </div>
 
         {/* Vehicle pills */}
         {user.vehicles.length > 0 && (
           <>
-            <div className="section-label" style={{ marginBottom: 8 }}>My vehicles</div>
+            <div className="section-label" style={{ marginBottom: 8 }}>My Garage</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {user.vehicles.map((v) => (
                 <button

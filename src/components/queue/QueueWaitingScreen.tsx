@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQueueStore } from '@/store/queueStore'
 import { useAuthStore } from '@/store/authStore'
+import { useAppStore } from '@/store/appStore'
+import { supabase } from '@/lib/supabase'
 import { useLeaveQueue } from '@/hooks/useQueue'
 import { CHARGER_INFO } from '@/utils'
 import { WaitRing } from './WaitRing'
@@ -10,9 +12,12 @@ import { BayTakenModal } from './BayTakenModal'
 import { FaultReportModal } from './FaultReportModal'
 import type { Bay } from '@/types'
 
+interface SiteAd { emoji: string; header: string; body: string; location: string | null; code: string | null }
+
 interface QueueWaitingScreenProps {
   onLeft: () => void
   onConfirmedArrival: () => void
+  onExpired: () => void
 }
 
 function BayCell({ bay, myBay }: { bay: Bay; myBay: number | null }) {
@@ -48,16 +53,31 @@ function BayCell({ bay, myBay }: { bay: Bay; myBay: number | null }) {
   )
 }
 
-export function QueueWaitingScreen({ onLeft, onConfirmedArrival }: QueueWaitingScreenProps) {
+export function QueueWaitingScreen({ onLeft, onConfirmedArrival, onExpired }: QueueWaitingScreenProps) {
   const myEntry = useQueueStore((s) => s.myEntry)
   const adminQueue = useQueueStore((s) => s.adminQueue)
   const bays = useQueueStore((s) => s.bays)
   const user = useAuthStore((s) => s.user)
+  const siteKey = useAppStore((s) => s.siteKey)
   const { leaveQueue, loading: leaveLoading } = useLeaveQueue()
 
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false)
   const [showBayTaken, setShowBayTaken] = useState(false)
   const [showFaultReport, setShowFaultReport] = useState(false)
+  const [activeAd, setActiveAd] = useState<SiteAd | null>(null)
+
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabase as any
+    db
+      .from('site_ads')
+      .select('emoji, header, body, location, code')
+      .eq('site_id', siteKey)
+      .eq('active', true)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }: { data: SiteAd | null }) => setActiveAd(data))
+  }, [siteKey])
 
   if (!myEntry) return null
 
@@ -88,6 +108,7 @@ export function QueueWaitingScreen({ onLeft, onConfirmedArrival }: QueueWaitingS
             await leaveQueue()
             onLeft()
           }}
+          onExpired={onExpired}
         />
 
         {/* Bay map while ready */}
@@ -167,65 +188,41 @@ export function QueueWaitingScreen({ onLeft, onConfirmedArrival }: QueueWaitingS
           </span>
         </div>
 
-        {/* ── Sponsored ad banner ── */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(239,159,39,0.12), rgba(239,159,39,0.06))',
-          border: '0.5px solid rgba(239,159,39,0.3)',
-          borderRadius: 'var(--rad)', marginBottom: 10, overflow: 'hidden',
-          position: 'relative',
-        }}>
-          {/* Sponsored label */}
+        {/* ── Sponsored ad banner (dynamic — set by site manager) ── */}
+        {activeAd && (
           <div style={{
-            position: 'absolute', top: 6, right: 8,
-            fontSize: 9, color: 'rgba(250,199,117,0.5)',
-            letterSpacing: '0.06em', textTransform: 'uppercase',
-          }}>Sponsored</div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px' }}>
-            {/* Brand icon */}
-            <div style={{
-              width: 52, height: 52, borderRadius: 12, flexShrink: 0,
-              background: 'rgba(239,159,39,0.15)',
-              border: '1px solid rgba(239,159,39,0.3)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 26,
-            }}>🍩</div>
-
-            <div style={{ flex: 1 }}>
-              <div style={{
-                fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 700,
-                color: 'var(--cream)', marginBottom: 2,
-              }}>
-                Krispy Kreme — Ampol Foodary
+            background: 'linear-gradient(135deg, rgba(239,159,39,0.12), rgba(239,159,39,0.06))',
+            border: '0.5px solid rgba(239,159,39,0.3)',
+            borderRadius: 'var(--rad)', marginBottom: 10, overflow: 'hidden',
+            position: 'relative',
+          }}>
+            <div style={{ position: 'absolute', top: 6, right: 8, fontSize: 9, color: 'rgba(250,199,117,0.5)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Sponsored</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px' }}>
+              <div style={{ width: 52, height: 52, borderRadius: 12, flexShrink: 0, background: 'rgba(239,159,39,0.15)', border: '1px solid rgba(239,159,39,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>
+                {activeAd.emoji}
               </div>
-              <div style={{ fontSize: 11, color: 'rgba(250,199,117,0.8)', lineHeight: 1.5, marginBottom: 8 }}>
-                Show this ad at the counter and get a <strong style={{ color: '#FAC775' }}>FREE donut</strong> with any purchase while you wait! ⚡
-              </div>
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                background: 'rgba(239,159,39,0.2)', border: '0.5px solid rgba(239,159,39,0.5)',
-                borderRadius: 20, padding: '4px 10px',
-                fontSize: 10, fontWeight: 600, color: '#FAC775', letterSpacing: '0.04em',
-              }}>
-                📍 50m away · Open now
+              <div style={{ flex: 1 }}>
+                <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 13, fontWeight: 700, color: 'var(--cream)', marginBottom: 2 }}>
+                  {activeAd.header}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(250,199,117,0.8)', lineHeight: 1.5, marginBottom: activeAd.location ? 8 : 0 }}>
+                  {activeAd.body}
+                </div>
+                {activeAd.location && (
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'rgba(239,159,39,0.2)', border: '0.5px solid rgba(239,159,39,0.5)', borderRadius: 20, padding: '4px 10px', fontSize: 10, fontWeight: 600, color: '#FAC775', letterSpacing: '0.04em' }}>
+                    📍 {activeAd.location}
+                  </div>
+                )}
               </div>
             </div>
+            {activeAd.code && (
+              <div style={{ borderTop: '0.5px solid rgba(239,159,39,0.2)', padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(0,0,0,0.15)' }}>
+                <span style={{ fontSize: 11, color: 'rgba(250,199,117,0.6)' }}>Show code at counter:</span>
+                <span style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 800, color: '#FAC775', letterSpacing: '0.12em' }}>{activeAd.code}</span>
+              </div>
+            )}
           </div>
-
-          {/* Redemption code strip */}
-          <div style={{
-            borderTop: '0.5px solid rgba(239,159,39,0.2)',
-            padding: '8px 14px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            background: 'rgba(0,0,0,0.15)',
-          }}>
-            <span style={{ fontSize: 11, color: 'rgba(250,199,117,0.6)' }}>Show code at counter:</span>
-            <span style={{
-              fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 800,
-              color: '#FAC775', letterSpacing: '0.12em',
-            }}>CQ-FREE</span>
-          </div>
-        </div>
+        )}
 
         {/* Bay map */}
         {bays.length > 0 && (

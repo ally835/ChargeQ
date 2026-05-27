@@ -1,10 +1,5 @@
 // ============================================================
 // ChargeQ — Supabase Database Types
-// 
-// Generate this file automatically with:
-//   npx supabase gen types typescript --project-id YOUR_PROJECT_ID > src/lib/database.types.ts
-//
-// This stub satisfies TypeScript until generation is run.
 // ============================================================
 
 export type Json =
@@ -28,7 +23,7 @@ export interface Database {
           created_at: string
         }
         Insert: {
-          id?: string
+          id: string
           phone: string
           name: string
           since?: string
@@ -36,8 +31,11 @@ export interface Database {
         }
         Update: {
           name?: string
+          phone?: string
+          since?: string
           sessions?: number
         }
+        Relationships: []
       }
       vehicles: {
         Row: {
@@ -59,11 +57,13 @@ export interface Database {
           is_default?: boolean
         }
         Update: {
+          plate?: string
           nick?: string
           charger?: string
           port_side?: string | null
           is_default?: boolean
         }
+        Relationships: []
       }
       queue_entries: {
         Row: {
@@ -84,8 +84,28 @@ export interface Database {
           joined_at: string
           updated_at: string
         }
-        Insert: Record<string, never>  // Always use RPC — never direct insert
-        Update: Record<string, never>  // Always use RPC — never direct update
+        Insert: {
+          site_id: string
+          site_name: string
+          name: string
+          phone: string
+          plate: string
+          charger: string
+          port_side?: string | null
+          bay_num?: number | null
+          position?: number
+          estimated_wait_mins?: number
+          status?: string
+          is_remote?: boolean
+          user_id?: string | null
+        }
+        Update: {
+          status?: string
+          bay_num?: number | null
+          position?: number
+          estimated_wait_mins?: number
+        }
+        Relationships: []
       }
       bays: {
         Row: {
@@ -98,8 +118,43 @@ export interface Database {
           fault_type: string | null
           updated_at: string
         }
-        Insert: Record<string, never>
-        Update: Record<string, never>
+        Insert: {
+          site_id: string
+          num: number
+          type: string
+          status?: string
+          plate?: string | null
+        }
+        Update: {
+          status?: string
+          plate?: string | null
+          fault_type?: string | null
+        }
+        Relationships: []
+      }
+      sites: {
+        Row: {
+          id: string
+          name: string
+          address: string | null
+          lat: number | null
+          lng: number | null
+          active: boolean
+          created_at: string
+        }
+        Insert: {
+          name: string
+          address?: string | null
+          lat?: number | null
+          lng?: number | null
+          active?: boolean
+        }
+        Update: {
+          name?: string
+          address?: string | null
+          active?: boolean
+        }
+        Relationships: []
       }
       fault_reports: {
         Row: {
@@ -124,6 +179,7 @@ export interface Database {
         Update: {
           resolved?: boolean
         }
+        Relationships: []
       }
       bay_taken_incidents: {
         Row: {
@@ -142,7 +198,10 @@ export interface Database {
           notes?: string | null
           reported_by?: string | null
         }
-        Update: Record<string, never>
+        Update: {
+          resolved?: boolean
+        }
+        Relationships: []
       }
       location_flags: {
         Row: {
@@ -153,6 +212,7 @@ export interface Database {
           lat: number | null
           lng: number | null
           reported_by: string | null
+          actioned: boolean
           reported_at: string
         }
         Insert: {
@@ -163,7 +223,30 @@ export interface Database {
           lng?: number | null
           reported_by?: string | null
         }
-        Update: Record<string, never>
+        Update: {
+          actioned?: boolean
+        }
+        Relationships: []
+      }
+      feedback: {
+        Row: {
+          id: string
+          rating: number
+          message: string | null
+          site_key: string | null
+          user_id: string | null
+          submitted_at: string
+        }
+        Insert: {
+          rating: number
+          message?: string | null
+          site_key?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          rating?: number
+        }
+        Relationships: []
       }
       site_managers: {
         Row: {
@@ -188,12 +271,14 @@ export interface Database {
           company?: string | null
           abn?: string | null
           sites?: string[]
+          status?: string
         }
         Update: {
           status?: string
           pin_hash?: string | null
           approved_at?: string | null
         }
+        Relationships: []
       }
       app_visitors: {
         Row: {
@@ -210,35 +295,51 @@ export interface Database {
           phone?: string | null
           user_agent?: string | null
         }
-        Update: Record<string, never>
+        Update: {
+          full_name?: string
+        }
+        Relationships: []
       }
       app_settings: {
         Row: {
           key: string
           pin_hash: string | null
         }
-        Insert: Record<string, never>
-        Update: Record<string, never>
+        Insert: {
+          key: string
+          pin_hash?: string | null
+        }
+        Update: {
+          pin_hash?: string | null
+        }
+        Relationships: []
       }
     }
-    Views: Record<string, never>
+    Views: {
+      [_ in never]: never
+    }
     Functions: {
       join_queue: {
         Args: {
           p_site_id: string
-          p_vehicle_id: string
+          p_site_name: string
+          p_name: string
+          p_phone: string
+          p_plate: string
+          p_charger: string
+          p_port_side?: string | null
           p_is_remote?: boolean
+          p_user_id?: string | null
         }
-        Returns: {
-          entry_id: string
-          position: number
-          estimated_wait_mins: number
-          bay_num: number | null
-        }
+        Returns: Json
       }
       leave_queue: {
         Args: { p_entry_id: string }
         Returns: boolean
+      }
+      get_site_queue_stats: {
+        Args: { p_site_id: string }
+        Returns: { queue_count: number; wait_mins: number }
       }
       set_bay_status: {
         Args: {
@@ -262,6 +363,10 @@ export interface Database {
       }
       verify_site_manager_pin: {
         Args: { manager_email: string; attempt: string }
+        Returns: Json
+      }
+      verify_site_manager_pin_change: {
+        Args: { manager_email: string; old_attempt: string; new_pin: string }
         Returns: Json
       }
       check_site_manager_email: {
@@ -293,7 +398,25 @@ export interface Database {
         Args: { sa_pin: string; manager_id: string }
         Returns: boolean
       }
+      get_vehicle_by_plate: {
+        Args: { p_plate: string }
+        Returns: Json
+      }
+      lookup_plate: {
+        Args: { p_plate: string }
+        Returns: Json
+      }
+      update_manager_pin: {
+        Args: { manager_email: string; old_attempt: string; new_pin: string }
+        Returns: Json
+      }
+      sa_reactivate_manager: {
+        Args: { sa_pin: string; manager_id: string; initial_pin: string }
+        Returns: boolean
+      }
     }
-    Enums: Record<string, never>
+    Enums: {
+      [_ in never]: never
+    }
   }
 }

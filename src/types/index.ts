@@ -37,7 +37,7 @@ export interface SiteInfo {
 
 // ── Queue ─────────────────────────────────────────────────
 
-export type QueueStatus = 'waiting' | 'ready' | 'charging' | 'left'
+export type QueueStatus = 'waiting' | 'ready' | 'charging' | 'left' | 'expired'
 
 export interface QueueEntry {
   id: string
@@ -64,6 +64,7 @@ export interface MyQueueEntry {
   siteName: string
   plate: string
   charger: ChargerType
+  portSide: PortSide
   bayNum: number | null
   position: number
   estimatedWaitMins: number

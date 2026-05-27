@@ -16,6 +16,11 @@ import { PortOnlyPicker } from '@/components/queue/PortOnlyPicker'
 import { MyAccountScreen } from '@/components/auth/MyAccountScreen'
 import { QueueJoinFlow } from '@/components/queue/QueueJoinFlow'
 import { QueueWaitingScreen } from '@/components/queue/QueueWaitingScreen'
+import { ExpiredScreen } from '@/components/queue/ExpiredScreen'
+import { ChargingScreen } from '@/components/queue/ChargingScreen'
+import { VehicleChoiceSheet } from '@/components/queue/VehicleChoiceSheet'
+import { AddVehicleSheet } from '@/components/queue/AddVehicleSheet'
+import { TempVehicleSheet } from '@/components/queue/TempVehicleSheet'
 import { SiteManagerLoginOverlay } from '@/components/admin/SiteManagerLoginOverlay'
 import { AdminPinOverlay } from '@/components/admin/AdminPinOverlay'
 
@@ -61,6 +66,11 @@ export default function QueuePage() {
   const [noCompatibleBay, setNoCompatibleBay] = useState<string | null>(null) // charger type that failed
   // Tracks the vehicle that needs port-only selection
   const [portOnlyVehicle, setPortOnlyVehicle] = useState<{ id: string; plate: string; charger: ChargerType } | null>(null)
+  const [showVehicleChoice, setShowVehicleChoice] = useState(false)
+  const [showAddVehicle, setShowAddVehicle] = useState(false)
+  const [showTempVehicle, setShowTempVehicle] = useState(false)
+
+  const [chargingLoading, setChargingLoading] = useState(false)
 
   const { joinQueue, loading: joinLoading, error: joinError, clearError } = useJoinQueue()
   const { verifySuperAdminPin, loading: saLoading, error: saError } = useSuperAdminLogin()
@@ -82,7 +92,7 @@ export default function QueuePage() {
       .from('queue_entries')
       .select('*')
       .eq('site_id', siteKey)
-      .in('status', ['waiting', 'ready'])
+      .in('status', ['waiting', 'ready', 'charging'])
       .eq('user_id', currentUser.id)
       .maybeSingle()
 
@@ -90,9 +100,10 @@ export default function QueuePage() {
       setMyEntry({
         id: existing.id, siteId: existing.site_id, siteName: existing.site_name,
         plate: existing.plate, charger: existing.charger as ChargerType,
+        portSide: (existing.port_side ?? 'rr') as PortSide,
         bayNum: existing.bay_num, position: existing.position,
         estimatedWaitMins: existing.estimated_wait_mins,
-        status: existing.status as 'waiting' | 'ready',
+        status: existing.status as 'waiting' | 'ready' | 'charging',
       })
       setScreen('s-queue')
       return
@@ -100,7 +111,6 @@ export default function QueuePage() {
 
     const vehicles = currentUser.vehicles
     if (vehicles.length === 0) {
-      // No vehicles — go to dashboard to add one
       setScreen('s-welcome')
       return
     }
@@ -143,15 +153,39 @@ export default function QueuePage() {
 
   async function handleOtpSuccess(destination: 'welcome' | 'setup') {
     if (destination === 'setup') {
-      // New user — go to registration
       setScreen('s-setup')
       return
     }
-    // Explicitly refresh user profile (don't rely on onAuthStateChange + timeout)
     const { refreshUser } = useAuthStore.getState()
     await refreshUser()
     const { user: currentUser } = useAuthStore.getState()
-    await attemptAutoJoin(currentUser)
+
+    // If already in an active queue at this site, restore that screen
+    if (currentUser) {
+      const { data: existing } = await supabase
+        .from('queue_entries')
+        .select('*')
+        .eq('site_id', siteKey)
+        .in('status', ['waiting', 'ready', 'charging'])
+        .eq('user_id', currentUser.id)
+        .maybeSingle()
+
+      if (existing) {
+        setMyEntry({
+          id: existing.id, siteId: existing.site_id, siteName: existing.site_name,
+          plate: existing.plate, charger: existing.charger as ChargerType,
+          portSide: (existing.port_side ?? 'rr') as PortSide,
+          bayNum: existing.bay_num, position: existing.position,
+          estimatedWaitMins: existing.estimated_wait_mins,
+          status: existing.status as 'waiting' | 'ready' | 'charging',
+        })
+        setScreen('s-queue')
+        return
+      }
+    }
+
+    // Always land on welcome dashboard — user picks their vehicle from here
+    setScreen('s-welcome')
   }
 
   // ── After setup completes ───────────────────────────────────────────
@@ -184,7 +218,7 @@ export default function QueuePage() {
       let bayList = bays
       if (bayList.length === 0) {
         const { data } = await supabase.from('bays').select('num,type,status').eq('site_id', siteKey)
-        bayList = (data ?? []).map((b: any) => ({ num: b.num, type: b.type, status: b.status }))
+        bayList = (data ?? []).map((b: any) => ({ num: b.num, type: b.type, status: b.status, plate: b.plate ?? null }))
       }
       if (bayList.length > 0) {
         const hasCompatible = bayList.some((b) => b.type === vehicle.charger)
@@ -280,7 +314,7 @@ export default function QueuePage() {
         .from('queue_entries')
         .select('*')
         .eq('site_id', siteKey)
-        .in('status', ['waiting', 'ready'])
+        .in('status', ['waiting', 'ready', 'charging'])
         .eq('user_id', user!.id)
         .maybeSingle()
 
@@ -288,9 +322,10 @@ export default function QueuePage() {
         setMyEntry({
           id: data.id, siteId: data.site_id, siteName: data.site_name,
           plate: data.plate, charger: data.charger as ChargerType,
+          portSide: (data.port_side ?? 'rr') as PortSide,
           bayNum: data.bay_num, position: data.position,
           estimatedWaitMins: data.estimated_wait_mins,
-          status: data.status as 'waiting' | 'ready',
+          status: data.status as 'waiting' | 'ready' | 'charging',
         })
         setScreen((prev) => prev === 's-phone' || prev === 's-welcome' ? 's-queue' : prev)
       } else {
@@ -410,27 +445,62 @@ export default function QueuePage() {
         </div>
       )}
 
+      {/* ── Queue expired — show rejoin screen ── */}
+      {screen === 's-queue' && myEntry?.status === 'expired' && (
+        <div style={{ animation: 'slideUp .3s cubic-bezier(.2,.8,.3,1)' }}>
+          <ExpiredScreen
+            charger={myEntry.charger}
+            portSide={myEntry.portSide ?? 'rr'}
+            siteName={myEntry.siteName}
+            onRejoin={async () => {
+              await joinQueue(myEntry.charger, myEntry.portSide ?? 'rr')
+              // joinQueue calls setMyEntry on success — status becomes 'waiting'
+              // which automatically hides this screen
+            }}
+            onDecline={() => { clearMyEntry(); setScreen('s-welcome') }}
+          />
+        </div>
+      )}
+
+      {/* ── Charging in progress ── */}
+      {screen === 's-queue' && myEntry?.status === 'charging' && (
+        <div style={{ animation: 'slideUp .3s cubic-bezier(.2,.8,.3,1)' }}>
+          <ChargingScreen
+            bayNum={myEntry.bayNum}
+            plate={myEntry.plate}
+            siteName={myEntry.siteName}
+            loading={chargingLoading}
+            onDone={async () => {
+              setChargingLoading(true)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabase as any).rpc('done_charging', { p_entry_id: myEntry.id })
+              setChargingLoading(false)
+              clearMyEntry()
+              setScreen('s-welcome')
+            }}
+          />
+        </div>
+      )}
+
       {/* ── Queue waiting / ready ── */}
-      {screen === 's-queue' && (
+      {screen === 's-queue' && myEntry?.status !== 'expired' && myEntry?.status !== 'charging' && (
         <div style={{ animation: 'slideUp .3s cubic-bezier(.2,.8,.3,1)' }}>
           <QueueWaitingScreen
             onLeft={() => { clearMyEntry(); setScreen('s-welcome'); }}
             onConfirmedArrival={async () => {
-              // Mark bay as occupied in DB
-              if (myEntry?.bayNum) {
-                await supabase.from('bays')
-                  .update({ status: 'occupied', plate: myEntry.plate })
-                  .eq('site_id', siteKey)
-                  .eq('num', myEntry.bayNum)
-              }
-              // Mark queue entry as completed
-              if (myEntry?.id) {
-                await supabase.from('queue_entries')
-                  .update({ status: 'left' })
-                  .eq('id', myEntry.id)
-              }
-              clearMyEntry()
-              setScreen('s-welcome')
+              if (!myEntry) return
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabase as any).rpc('confirm_arrival', {
+                p_entry_id: myEntry.id,
+                p_bay_num:  myEntry.bayNum ?? 0,
+              })
+              setMyEntry({ ...myEntry, status: 'charging' })
+            }}
+            onExpired={async () => {
+              if (!myEntry) return
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              await (supabase as any).rpc('expire_my_entry', { p_entry_id: myEntry.id })
+              // Realtime will update status to 'expired' — ExpiredScreen renders automatically
             }}
           />
         </div>
@@ -443,7 +513,7 @@ export default function QueuePage() {
             queueCount={queueStats.count}
             waitMins={queueStats.waitMins}
             bays={bays}
-            onJoinQueue={() => setScreen('s-join')}
+            onJoinQueue={() => setShowVehicleChoice(true)}
             onQuickJoin={handleQuickJoin}
             onManageAccount={() => setScreen('s-my-account')}
             onSelectVehicle={(id) => updateSelectedVehicle(id)}
@@ -468,6 +538,31 @@ export default function QueuePage() {
             error={joinError}
           />
         </div>
+      )}
+
+      {/* ── Vehicle choice sheet (Add to Garage vs Temp) ── */}
+      {showVehicleChoice && (
+        <VehicleChoiceSheet
+          onAddToGarage={() => { setShowVehicleChoice(false); setShowAddVehicle(true) }}
+          onTempCar={() => { setShowVehicleChoice(false); setShowTempVehicle(true) }}
+          onClose={() => setShowVehicleChoice(false)}
+        />
+      )}
+
+      {/* ── Add to Garage sheet ── */}
+      {showAddVehicle && (
+        <AddVehicleSheet
+          onConfirm={(vehicle) => { setShowAddVehicle(false); handleVehiclePicked(vehicle) }}
+          onClose={() => setShowAddVehicle(false)}
+        />
+      )}
+
+      {/* ── Temporary car sheet ── */}
+      {showTempVehicle && (
+        <TempVehicleSheet
+          onConfirm={(vehicle) => { setShowTempVehicle(false); handleVehiclePicked(vehicle) }}
+          onClose={() => setShowTempVehicle(false)}
+        />
       )}
 
       {/* ── Admin hub modal ── */}

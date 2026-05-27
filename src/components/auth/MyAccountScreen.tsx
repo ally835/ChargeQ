@@ -242,7 +242,8 @@ export function MyAccountScreen({ onBack }: MyAccountScreenProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   if (!user) return null
-  const initials = getUserInitials(user.name)
+  const u = user
+  const initials = getUserInitials(u.name)
 
   async function handleSaveVehicle(vehicleId: string, updates: Partial<Vehicle>) {
     const { error } = await supabase
@@ -258,8 +259,8 @@ export function MyAccountScreen({ onBack }: MyAccountScreenProps) {
     if (error) { toast('Could not save changes. Please try again.'); return }
 
     setUser({
-      ...user,
-      vehicles: user.vehicles.map((v) =>
+      ...u,
+      vehicles: u.vehicles.map((v) =>
         v.id === vehicleId ? { ...v, ...updates } : v
       ),
     })
@@ -276,22 +277,22 @@ export function MyAccountScreen({ onBack }: MyAccountScreenProps) {
     if (error) { toast('Could not delete vehicle.'); return }
 
     setUser({
-      ...user,
-      vehicles: user.vehicles.filter((v) => v.id !== vehicleId),
-      selectedVehicleId: user.selectedVehicleId === vehicleId
-        ? user.vehicles.find((v) => v.id !== vehicleId)?.id ?? null
-        : user.selectedVehicleId,
+      ...u,
+      vehicles: u.vehicles.filter((v) => v.id !== vehicleId),
+      selectedVehicleId: u.selectedVehicleId === vehicleId
+        ? u.vehicles.find((v) => v.id !== vehicleId)?.id ?? null
+        : u.selectedVehicleId,
     })
     setDeletingId(null)
     toast('Vehicle removed from your garage')
   }
 
   async function handleSetDefault(vehicleId: string) {
-    await supabase.from('vehicles').update({ is_default: false }).eq('user_id', user.id)
+    await supabase.from('vehicles').update({ is_default: false }).eq('user_id', u.id)
     await supabase.from('vehicles').update({ is_default: true }).eq('id', vehicleId)
     setUser({
-      ...user,
-      vehicles: user.vehicles.map((v) => ({ ...v, isDefault: v.id === vehicleId })),
+      ...u,
+      vehicles: u.vehicles.map((v) => ({ ...v, isDefault: v.id === vehicleId })),
       selectedVehicleId: vehicleId,
     })
     toast('Default vehicle updated ✓')
@@ -319,8 +320,8 @@ export function MyAccountScreen({ onBack }: MyAccountScreenProps) {
           {initials}
         </div>
         <div>
-          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 16, fontWeight: 700, color: 'var(--cream)' }}>{user.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--mint)' }}>{user.phone}</div>
+          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 16, fontWeight: 700, color: 'var(--cream)' }}>{u.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--mint)' }}>{u.phone}</div>
         </div>
       </div>
 
@@ -348,7 +349,7 @@ export function MyAccountScreen({ onBack }: MyAccountScreenProps) {
       {/* ── MY GARAGE TAB ── */}
       {tab === 'garage' && (
         <>
-          {user.vehicles.length === 0 && !showAddForm && (
+          {u.vehicles.length === 0 && !showAddForm && (
             <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--mint)', fontSize: 13 }}>
               <div style={{ fontSize: 40, marginBottom: 12 }}>🚗</div>
               <div style={{ marginBottom: 16 }}>No vehicles yet. Add your first car to join the queue.</div>
@@ -356,7 +357,7 @@ export function MyAccountScreen({ onBack }: MyAccountScreenProps) {
           )}
 
           {/* Vehicle cards */}
-          {user.vehicles.map((v) => {
+          {u.vehicles.map((v) => {
             const chargerInfo = CHARGER_INFO[v.charger]
             const portLabel = PORT_OPTIONS.find((p) => p.id === v.portSide)
 
@@ -501,10 +502,10 @@ export function MyAccountScreen({ onBack }: MyAccountScreenProps) {
           <div className="cq-card">
             <div className="section-label">Account details</div>
             {[
-              { label: 'Name', value: user.name },
-              { label: 'Mobile', value: user.phone },
-              { label: 'Member since', value: user.since },
-              { label: 'Queue sessions', value: String(user.sessions) },
+              { label: 'Name', value: u.name },
+              { label: 'Mobile', value: u.phone },
+              { label: 'Member since', value: u.since },
+              { label: 'Queue sessions', value: String(u.sessions) },
             ].map(({ label, value }) => (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '0.5px solid rgba(29,158,117,0.1)', fontSize: 13 }}>
                 <span style={{ color: 'var(--mint)' }}>{label}</span>
