@@ -89,6 +89,7 @@ export function useJoinQueue() {
     }
 
     setMyEntry(entry)
+    localStorage.setItem('cq_entry', data.entry_id ?? '')
     toast(`You're #${data.position} in the queue. We'll SMS you when ready! ⚡`)
     return true
   }

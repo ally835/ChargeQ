@@ -294,7 +294,34 @@ export default function QueuePage() {
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated || !user) {
-      // Only reset to phone if not mid-flow — never interrupt setup or otp
+      // Auth session gone — try to restore from cached entry ID before showing phone screen
+      const cachedId = localStorage.getItem('cq_entry')
+      if (cachedId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        void (supabase as any).rpc('get_queue_entry_by_id', { p_entry_id: cachedId, p_site_id: siteKey })
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .then(({ data }: { data: any[] | null }) => {
+            const e = data?.[0]
+            if (e) {
+              setMyEntry({
+                id: e.id, siteId: e.site_id, siteName: e.site_name,
+                plate: e.plate, charger: e.charger as ChargerType,
+                portSide: (e.port_side ?? 'rr') as PortSide,
+                bayNum: e.bay_num, position: e.position,
+                estimatedWaitMins: e.estimated_wait_mins,
+                status: e.status as 'waiting' | 'ready' | 'charging',
+              })
+              setScreen('s-queue')
+            } else {
+              localStorage.removeItem('cq_entry')
+              setScreen((prev) => {
+                if (prev === 's-setup' || prev === 's-otp' || prev === 's-queue' || prev === 's-join' || prev === 's-port-only') return prev
+                return 's-phone'
+              })
+            }
+          })
+        return  // wait for RPC — don't immediately flip to phone
+      }
       setScreen((prev) => {
         if (prev === 's-setup' || prev === 's-otp' || prev === 's-queue' || prev === 's-join' || prev === 's-port-only') return prev
         return 's-phone'

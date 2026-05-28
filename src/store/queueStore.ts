@@ -72,5 +72,8 @@ export const useQueueStore = create<QueueState>()((set, get) => ({
     })
   },
 
-  clearMyEntry: () => set({ myEntry: null }),
+  clearMyEntry: () => {
+    localStorage.removeItem('cq_entry')
+    set({ myEntry: null })
+  },
 }))
