@@ -20,7 +20,9 @@ export function StationDetailPanel({ station, isJoined, onJoined, onClose }: Sta
   const siteInfo = useAppStore((s) => s.siteInfo)
   const toast = useToast()
   const [joining, setJoining] = useState(false)
+  const [joinError, setJoinError] = useState<string | null>(null)
   const [showFlag, setShowFlag] = useState(false)
+  const [flagDefaultReason, setFlagDefaultReason] = useState<string | undefined>(undefined)
 
   const driveMins = estimatedDriveMins(station.distanceKm)
 
@@ -37,6 +39,7 @@ export function StationDetailPanel({ station, isJoined, onJoined, onClose }: Sta
       return
     }
 
+    setJoinError(null)
     setJoining(true)
 
     const { data, error } = await supabase.rpc('join_queue', {
@@ -54,9 +57,15 @@ export function StationDetailPanel({ station, isJoined, onJoined, onClose }: Sta
 
     const result = data as { error?: string; position?: number } | null
     if (error || !result || result.error) {
-      toast(result?.error === 'already_in_queue'
-        ? "You're already in the queue at this station."
-        : 'Could not join queue. Please try again.')
+      if (result?.error === 'already_in_queue') {
+        toast("You're already in the queue at this station.")
+      } else if (result?.error === 'no_compatible_bay' && station.isChargeQ) {
+        setJoinError('No compatible charger type available at this location right now.')
+      } else {
+        setJoinError(station.isChargeQ
+          ? 'Could not join queue. Please try again.'
+          : 'ChargeQ isn\'t active at this location yet. Be the first to request it!')
+      }
       return
     }
 
@@ -178,6 +187,35 @@ export function StationDetailPanel({ station, isJoined, onJoined, onClose }: Sta
           </button>
         )}
 
+        {/* Join error */}
+        {joinError && (
+          <div style={{
+            background: 'var(--al)', border: '0.5px solid var(--ab)',
+            borderRadius: 'var(--rads)', padding: '10px 12px',
+            marginBottom: 8,
+          }}>
+            <div style={{ fontSize: 12, color: 'var(--amber-t)', lineHeight: 1.5, marginBottom: !station.isChargeQ ? 8 : 0 }}>
+              {joinError}
+            </div>
+            {!station.isChargeQ && (
+              <button
+                onClick={() => { setJoinError(null); setFlagDefaultReason('no-chargeq'); setShowFlag(true) }}
+                style={{
+                  width: '100%', height: 36,
+                  background: 'rgba(29,158,117,0.12)',
+                  color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)',
+                  borderRadius: 'var(--rads)',
+                  fontFamily: '"DM Sans", sans-serif', fontSize: 12, fontWeight: 500,
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                ⚡ Request ChargeQ at this location
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Navigation */}
         <button
           onClick={() => {
@@ -231,7 +269,8 @@ export function StationDetailPanel({ station, isJoined, onJoined, onClose }: Sta
           stationName={station.name}
           lat={station.lat}
           lng={station.lng}
-          onClose={() => setShowFlag(false)}
+          defaultReason={flagDefaultReason}
+          onClose={() => { setShowFlag(false); setFlagDefaultReason(undefined) }}
         />
       )}
     </>

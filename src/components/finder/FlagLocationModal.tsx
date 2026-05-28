@@ -16,10 +16,11 @@ interface FlagLocationModalProps {
   lat: number | null
   lng: number | null
   onClose: () => void
+  defaultReason?: string
 }
 
-export function FlagLocationModal({ stationName, lat, lng, onClose }: FlagLocationModalProps) {
-  const [reason, setReason] = useState<string | null>(null)
+export function FlagLocationModal({ stationName, lat, lng, onClose, defaultReason }: FlagLocationModalProps) {
+  const [reason, setReason] = useState<string | null>(defaultReason ?? null)
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
   const user = useAuthStore((s) => s.user)
