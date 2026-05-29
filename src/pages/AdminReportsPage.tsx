@@ -131,7 +131,11 @@ export default function AdminReportsPage() {
     setActioning(id)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await (supabase as any).rpc('mark_flag_actioned', { p_flag_id: id })
-    if (data) setFlags((prev) => prev.map((f) => f.id === id ? { ...f, actioned: true } : f))
+    if (data) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any).rpc('archive_location_flag', { p_flag_id: id })
+      setFlags((prev) => prev.map((f) => f.id === id ? { ...f, actioned: true, archived: true } : f))
+    }
     setActioning(null)
   }
 
