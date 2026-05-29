@@ -18,6 +18,26 @@ interface PendingManager {
   created_at: string
 }
 
+const linkBtnStyle: React.CSSProperties = {
+  border: 'none', borderRadius: 6, padding: '4px 10px',
+  fontSize: 11, fontFamily: '"DM Sans", sans-serif',
+  cursor: 'pointer', fontWeight: 500, textDecoration: 'none',
+  display: 'inline-flex', alignItems: 'center', gap: 4,
+  background: 'rgba(29,158,117,0.1)', color: 'var(--mint)',
+  border_unused: '0.5px solid rgba(29,158,117,0.25)',
+} as React.CSSProperties
+
+function downloadCSV(rows: string[][], filename: string) {
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function ApproveManagerModal({
   manager, onClose, onApproved,
 }: {
@@ -167,9 +187,38 @@ export default function AdminApprovalsPage() {
     loadManagers()
   }
 
+  async function handleResetPin(manager: PendingManager) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any).rpc('sa_reset_manager_pin', {
+      sa_pin: getSuperAdminPin(),
+      p_manager_id: manager.id,
+    })
+    if (!data) { toast('Could not reset PIN. Check SA PIN.'); return }
+    toast(`PIN reset to 1234 for ${manager.name} — they must change it on next login.`)
+    const body = encodeURIComponent(
+      `Hi ${manager.name.split(' ')[0]},\n\nYour ChargeQ site manager PIN has been reset to 1234.\nLog in at https://chargeq.net and you will be prompted to set a new PIN immediately.\n\nChargeQ Team`
+    )
+    window.open(`mailto:${manager.email}?subject=${encodeURIComponent('ChargeQ PIN reset')}&body=${body}`)
+  }
+
+  function handleExportCSV() {
+    const rows = [['Name', 'Email', 'Job Title', 'Company', 'Sites', 'Status', 'Registered']]
+    managers.forEach((m) => rows.push([
+      m.name, m.email, m.job_title ?? '', m.company ?? '',
+      m.sites.join('; '), m.status,
+      new Date(m.created_at).toLocaleDateString(),
+    ]))
+    downloadCSV(rows, 'chargeq_site_managers.csv')
+  }
+
   const pending   = managers.filter((m) => m.status === 'pending')
   const approved  = managers.filter((m) => m.status === 'approved')
   const suspended = managers.filter((m) => m.status === 'suspended')
+
+  const btnStyle: React.CSSProperties = {
+    border: 'none', borderRadius: 6, padding: '4px 10px',
+    fontSize: 11, fontFamily: '"DM Sans", sans-serif', cursor: 'pointer', fontWeight: 500,
+  }
 
   return (
     <div style={{ padding: '14px 16px' }}>
@@ -201,9 +250,16 @@ export default function AdminApprovalsPage() {
           <div className="section-label" style={{ margin: 0, color: pending.length > 0 ? 'var(--amber-t)' : undefined }}>
             {pending.length > 0 ? `⏳ ${pending.length} pending approval${pending.length > 1 ? 's' : ''}` : 'Pending approvals'}
           </div>
-          <button onClick={loadManagers} style={{ background: 'none', border: 'none', color: 'var(--teal)', fontSize: 12, cursor: 'pointer', fontFamily: '"DM Sans", sans-serif' }}>
-            {loading ? '...' : 'Refresh'}
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {managers.length > 0 && (
+              <button onClick={handleExportCSV} style={{ ...btnStyle, background: 'var(--gc)', color: 'var(--teal)', border: '0.5px solid var(--gb)' }}>
+                ↓ Export CSV
+              </button>
+            )}
+            <button onClick={loadManagers} style={{ background: 'none', border: 'none', color: 'var(--teal)', fontSize: 12, cursor: 'pointer', fontFamily: '"DM Sans", sans-serif' }}>
+              {loading ? '...' : 'Refresh'}
+            </button>
+          </div>
         </div>
 
         {pending.length === 0 && !loading && (
@@ -215,20 +271,27 @@ export default function AdminApprovalsPage() {
             <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 700, color: 'var(--amber-t)', marginBottom: 3 }}>{m.name}</div>
             <div style={{ fontSize: 11, color: 'rgba(239,159,39,0.8)', marginBottom: 2 }}>{m.email}</div>
             <div style={{ fontSize: 11, color: 'rgba(239,159,39,0.7)', marginBottom: 2 }}>{m.job_title} @ {m.company}</div>
+            {m.abn && <div style={{ fontSize: 11, color: 'rgba(239,159,39,0.6)', marginBottom: 2 }}>ABN: {m.abn}</div>}
             {m.sites.length > 0 && <div style={{ fontSize: 11, color: 'rgba(239,159,39,0.6)', marginBottom: 10 }}>Sites: {m.sites.join(', ')}</div>}
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <button
                 onClick={() => setApproving(m)}
-                style={{ flex: 1, height: 34, background: 'var(--g)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: '"DM Sans", sans-serif' }}
+                style={{ flex: 1, minWidth: 120, height: 34, background: 'var(--g)', color: '#fff', border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: '"DM Sans", sans-serif' }}
               >
                 ✓ Approve & set PIN
               </button>
               <button
                 onClick={() => handleSuspend(m)}
-                style={{ flex: 1, height: 34, background: 'transparent', color: '#F7C1C1', border: '0.5px solid var(--rb)', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: '"DM Sans", sans-serif' }}
+                style={{ flex: 1, minWidth: 80, height: 34, background: 'transparent', color: '#F7C1C1', border: '0.5px solid var(--rb)', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: '"DM Sans", sans-serif' }}
               >
                 ✗ Decline
               </button>
+              <a
+                href={`mailto:hello@chargeq.com.au?subject=${encodeURIComponent(`Verify manager: ${m.name}`)}&body=${encodeURIComponent(`Please verify the following manager request:\n\nName: ${m.name}\nEmail: ${m.email}\nJob title: ${m.job_title ?? '—'} @ ${m.company ?? '—'}\nABN: ${m.abn ?? '—'}\nSites: ${m.sites.join(', ')}\n\nRegistered: ${new Date(m.created_at).toLocaleString()}`)}`}
+                style={{ height: 34, padding: '0 12px', background: 'rgba(239,159,39,0.1)', color: 'var(--amber-t)', border: '0.5px solid rgba(239,159,39,0.25)', borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: '"DM Sans", sans-serif', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                ✉ Verify with HQ
+              </a>
             </div>
           </div>
         ))}
@@ -240,17 +303,33 @@ export default function AdminApprovalsPage() {
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(29,158,117,0.3), transparent)' }} />
           <div className="section-label" style={{ marginBottom: 10 }}>Active site managers</div>
           {approved.map((m) => (
-            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '0.5px solid rgba(29,158,117,0.1)' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--cream)' }}>{m.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--mint)' }}>{m.email} · {m.sites.slice(0,2).join(', ')}</div>
+            <div key={m.id} style={{ padding: '10px 0', borderBottom: '0.5px solid rgba(29,158,117,0.1)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--cream)' }}>{m.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--mint)' }}>{m.email} · {m.sites.slice(0,2).join(', ')}</div>
+                </div>
               </div>
-              <button
-                onClick={() => handleSuspend(m)}
-                style={{ background: 'transparent', border: '0.5px solid var(--rb)', borderRadius: 6, padding: '4px 10px', fontSize: 11, color: '#F7C1C1', cursor: 'pointer', fontFamily: '"DM Sans", sans-serif' }}
-              >
-                Suspend
-              </button>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => handleSuspend(m)}
+                  style={{ ...btnStyle, background: 'transparent', color: '#F7C1C1', border: '0.5px solid var(--rb)' }}
+                >
+                  Suspend
+                </button>
+                <a
+                  href={`mailto:${m.email}?subject=${encodeURIComponent('ChargeQ site manager access')}&body=${encodeURIComponent(`Hi ${m.name.split(' ')[0]},\n\nYour ChargeQ site manager account is active. Log in at https://chargeq.net and use the Site Manager login option.\n\nIf you have any questions, reply to this email.\n\nChargeQ Team`)}`}
+                  style={{ ...btnStyle, background: 'rgba(29,158,117,0.1)', color: 'var(--mint)', border: '0.5px solid rgba(29,158,117,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                >
+                  ✉ Resend link
+                </a>
+                <button
+                  onClick={() => handleResetPin(m)}
+                  style={{ ...btnStyle, background: 'rgba(239,159,39,0.1)', color: 'var(--amber-t)', border: '0.5px solid rgba(239,159,39,0.25)' }}
+                >
+                  🔑 Reset PIN
+                </button>
+              </div>
             </div>
           ))}
         </div>

@@ -11,6 +11,12 @@ import type { QueueEntry } from '@/types'
 let _pinAttempts = 0
 let _pinLockUntil = 0
 
+// SM-specific lockout: 3 attempts → 5-minute lock
+let _smPinAttempts = 0
+let _smLockUntil = 0
+const SM_MAX_ATTEMPTS = 3
+const SM_LOCK_MS = 5 * 60 * 1000
+
 // ── Super admin PIN — module-scoped session storage ───────────────────
 // Held in memory only; never persisted to localStorage or sessionStorage.
 // Cleared when the SA locks out (handleLockOut in AdminSettingsPage).
@@ -85,11 +91,12 @@ export function useSuperAdminLogin() {
 // ── Site Manager login: Step 1 (email check) ─────────────────────────
 
 export function useSiteManagerLogin() {
-  const [step, setStep] = useState<'email' | 'pin' | 'change-pin' | 'pending'>('email')
+  const [step, setStep] = useState<'email' | 'pin' | 'change-pin' | 'pending' | 'locked'>('email')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [managerEmail, setManagerEmail] = useState('')
   const [managerName, setManagerName] = useState('')
+  const [lockSecsLeft, setLockSecsLeft] = useState(0)
   const setAppMode = useAppStore((s) => s.setAppMode)
   const setAdminSessionManagerId = useAppStore((s) => s.setAdminSessionManagerId)
   const toast = useToast()
@@ -113,6 +120,14 @@ export function useSiteManagerLogin() {
   }
 
   async function verifyPin(pin: string): Promise<boolean> {
+    // Check SM-specific lockout first
+    if (Date.now() < _smLockUntil) {
+      const secsLeft = Math.ceil((_smLockUntil - Date.now()) / 1000)
+      setLockSecsLeft(secsLeft)
+      setStep('locked')
+      return false
+    }
+
     if (!checkPinRateLimit()) {
       setError('Too many attempts. Please wait 60 seconds.')
       return false
@@ -130,11 +145,24 @@ export function useSiteManagerLogin() {
 
     const res = data as { status: string; id?: string; name?: string; must_change_pin?: boolean }
 
-    if (res.status === 'wrong_pin') { setError('Incorrect PIN. Please try again.'); return false }
+    if (res.status === 'wrong_pin') {
+      _smPinAttempts++
+      if (_smPinAttempts >= SM_MAX_ATTEMPTS) {
+        _smLockUntil = Date.now() + SM_LOCK_MS
+        _smPinAttempts = 0
+        setLockSecsLeft(SM_LOCK_MS / 1000)
+        setStep('locked')
+        return false
+      }
+      const remaining = SM_MAX_ATTEMPTS - _smPinAttempts
+      setError(`Incorrect PIN. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`)
+      return false
+    }
     if (res.status === 'pending') { setStep('pending'); return false }
     if (res.status === 'suspended') { setError('Account suspended.'); return false }
 
     if (res.status === 'approved' || res.status === 'must_change_pin') {
+      _smPinAttempts = 0  // reset on successful login
       setManagerName(res.name ?? '')
       setAdminSessionManagerId(res.id ?? null)
 
@@ -150,6 +178,15 @@ export function useSiteManagerLogin() {
 
     setError('Login failed. Please try again.')
     return false
+  }
+
+  async function requestPinReset(): Promise<void> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).rpc('sm_request_pin_reset', { p_email: managerEmail })
+    const body = encodeURIComponent(
+      `Hi ChargeQ,\n\nI have been locked out of my site manager account after too many incorrect PIN attempts.\n\nEmail: ${managerEmail}\n\nPlease reset my PIN so I can log in.\n\nThanks`
+    )
+    window.open(`mailto:hello@chargeq.com.au?subject=${encodeURIComponent('PIN reset request — Site Manager')}&body=${body}`)
   }
 
   async function changePin(oldPin: string, newPin: string): Promise<boolean> {
@@ -176,8 +213,8 @@ export function useSiteManagerLogin() {
   }
 
   return {
-    step, loading, error, managerEmail,
-    checkEmail, verifyPin, changePin, reset,
+    step, loading, error, managerEmail, lockSecsLeft,
+    checkEmail, verifyPin, changePin, reset, requestPinReset,
     clearError: () => setError(null),
     goBackToEmail: () => { setStep('email'); setError(null) },
   }

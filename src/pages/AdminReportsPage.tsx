@@ -4,9 +4,9 @@ import { useAppStore } from '@/store/appStore'
 import { useQueueStore } from '@/store/queueStore'
 import { AdminBadge } from '@/components/admin/AdminBadge'
 
-interface FaultReport { id: string; bay_num: number|null; fault_type: string; description: string|null; reported_at: string; resolved: boolean }
+interface FaultReport { id: string; bay_num: number|null; fault_type: string; description: string|null; reported_at: string; resolved: boolean; archived: boolean; forwarded_to_maintenance: boolean }
 interface BayTakenIncident { id: string; assigned_bay: number; offender_plate: string|null; fault_type?: string|null; notes: string|null; reported_at: string }
-interface LocationFlag { id: string; station_name: string; reason: string; notes: string|null; reported_at: string; actioned: boolean }
+interface LocationFlag { id: string; station_name: string; reason: string; notes: string|null; reported_at: string; actioned: boolean; archived: boolean }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -56,9 +56,13 @@ export default function AdminReportsPage() {
   const [flagsError, setFlagsError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [showActioned, setShowActioned] = useState(false)
+  const [showArchivedFlags, setShowArchivedFlags] = useState(false)
+  const [showArchivedFaults, setShowArchivedFaults] = useState(false)
   const [actioning, setActioning] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState<string | null>(null)
+  const [archivingFlag, setArchivingFlag] = useState<string | null>(null)
   const [resolvingFault, setResolvingFault] = useState<string | null>(null)
+  const [archivingFault, setArchivingFault] = useState<string | null>(null)
+  const [forwardingFault, setForwardingFault] = useState<string | null>(null)
 
   async function fetchAll() {
     setRefreshing(true)
@@ -67,7 +71,7 @@ export default function AdminReportsPage() {
     async function fetchFlags() {
       const r = await supabase.from('location_flags').select('*').order('reported_at', { ascending: false }).limit(100)
       if (r.error) setFlagsError(r.error.message)
-      else if (r.data) setFlags(r.data as LocationFlag[])
+      else if (r.data) setFlags(r.data as unknown as LocationFlag[])
     }
 
     async function fetchFaults() {
@@ -100,6 +104,29 @@ export default function AdminReportsPage() {
     setResolvingFault(null)
   }
 
+  async function handleArchiveFault(id: string) {
+    setArchivingFault(id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any).rpc('archive_fault_report', { p_fault_id: id })
+    if (data) setFaults((prev) => prev.map((f) => f.id === id ? { ...f, archived: true } : f))
+    setArchivingFault(null)
+  }
+
+  async function handleForwardFault(id: string, fault: FaultReport) {
+    setForwardingFault(id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any).rpc('forward_fault_report', { p_fault_id: id })
+    if (data) {
+      setFaults((prev) => prev.map((f) => f.id === id ? { ...f, forwarded_to_maintenance: true } : f))
+      const bay = fault.bay_num != null ? `Bay ${fault.bay_num}` : 'Unknown bay'
+      const body = encodeURIComponent(
+        `Hi,\n\nA bay fault has been reported at ${siteInfo.name}.\n\nType: ${fault.fault_type}\nBay: ${bay}\n${fault.description ? `Details: ${fault.description}\n` : ''}\nReported: ${new Date(fault.reported_at).toLocaleString()}\n\nPlease action as soon as possible.\n\nChargeQ`
+      )
+      window.open(`mailto:maintenance@chargeq.com.au?subject=${encodeURIComponent(`Bay fault: ${fault.fault_type} — ${siteInfo.name}`)}&body=${body}`)
+    }
+    setForwardingFault(null)
+  }
+
   async function handleMarkActioned(id: string) {
     setActioning(id)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,23 +135,24 @@ export default function AdminReportsPage() {
     setActioning(null)
   }
 
-  async function handleDelete(id: string, name: string) {
-    if (!window.confirm(`Delete flag for "${name}"? This cannot be undone.`)) return
-    setDeleting(id)
+  async function handleArchiveFlag(id: string) {
+    setArchivingFlag(id)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase as any).rpc('delete_location_flag', { p_flag_id: id })
-    if (data) setFlags((prev) => prev.filter((f) => f.id !== id))
-    setDeleting(null)
+    const { data } = await (supabase as any).rpc('archive_location_flag', { p_flag_id: id })
+    if (data) setFlags((prev) => prev.map((f) => f.id === id ? { ...f, archived: true } : f))
+    setArchivingFlag(null)
   }
 
   function exportFaultsCSV() {
-    const rows: string[][] = [['Bay', 'Fault Type', 'Description', 'Reported', 'Resolved']]
+    const rows: string[][] = [['Bay', 'Fault Type', 'Description', 'Reported', 'Resolved', 'Forwarded', 'Archived']]
     faults.forEach((f) => rows.push([
       f.bay_num != null ? String(f.bay_num) : '—',
       f.fault_type,
       f.description ?? '',
       new Date(f.reported_at).toLocaleString(),
       f.resolved ? 'Yes' : 'No',
+      f.forwarded_to_maintenance ? 'Yes' : 'No',
+      f.archived ? 'Yes' : 'No',
     ]))
     downloadCSV(rows, `${siteInfo.name.replace(/\s+/g,'_')}_fault_reports.csv`)
   }
@@ -140,8 +168,12 @@ export default function AdminReportsPage() {
     downloadCSV(rows, `${siteInfo.name.replace(/\s+/g,'_')}_bay_taken_incidents.csv`)
   }
 
-  const openFlags = flags.filter((f) => !f.actioned)
-  const actionedFlags = flags.filter((f) => f.actioned)
+  const activeFaults   = faults.filter((f) => !f.archived)
+  const archivedFaults = faults.filter((f) => f.archived)
+
+  const openFlags     = flags.filter((f) => !f.actioned && !f.archived)
+  const actionedFlags = flags.filter((f) => f.actioned && !f.archived)
+  const archivedFlags = flags.filter((f) => f.archived)
 
   const chargerCounts: Record<string, number> = {}
   adminQueue.forEach((e) => { chargerCounts[e.charger] = (chargerCounts[e.charger] || 0) + 1 })
@@ -173,7 +205,7 @@ export default function AdminReportsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 10, fontWeight: 500, color: 'var(--amber-t)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>⚠️ Bay fault reports</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 10, color: 'rgba(239,159,39,0.6)' }}>{faults.length > 0 ? `${faults.length} reported` : 'None reported'}</span>
+              <span style={{ fontSize: 10, color: 'rgba(239,159,39,0.6)' }}>{activeFaults.length > 0 ? `${activeFaults.length} reported` : 'None reported'}</span>
               {faults.length > 0 && (
                 <button onClick={exportFaultsCSV} style={{ ...btnBase, background: 'var(--gc)', color: 'var(--teal)', border: '0.5px solid var(--gb)', padding: '3px 8px' }}>
                   ↓ CSV
@@ -181,29 +213,68 @@ export default function AdminReportsPage() {
               )}
             </div>
           </div>
-          {faults.length === 0 ? (
+          {activeFaults.length === 0 ? (
             <p style={{ fontSize: 12, color: 'var(--mint)', textAlign: 'center', padding: 8 }}>No faults reported.</p>
           ) : (
-            faults.map((f) => (
-              <div key={f.id} style={{ background: 'var(--al)', border: '0.5px solid var(--ab)', borderLeft: '3px solid var(--a)', borderRadius: 'var(--rads)', padding: '12px 14px', marginBottom: 8, opacity: f.resolved ? 0.45 : 1 }}>
+            activeFaults.map((f) => (
+              <div key={f.id} style={{ background: 'var(--al)', border: '0.5px solid var(--ab)', borderLeft: '3px solid var(--a)', borderRadius: 'var(--rads)', padding: '12px 14px', marginBottom: 8, opacity: f.resolved ? 0.55 : 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--amber-t)' }}>{f.fault_type}{f.bay_num != null ? ` — Bay ${f.bay_num}` : ''}</div>
                   <div style={{ fontSize: 10, color: 'rgba(239,159,39,0.5)' }}>{timeAgo(f.reported_at)}</div>
                 </div>
-                {f.description && <div style={{ fontSize: 11, color: 'rgba(239,159,39,0.85)', marginBottom: 6 }}>{f.description}</div>}
-                {f.resolved ? (
-                  <div style={{ fontSize: 10, color: 'var(--teal)', marginTop: 4 }}>✓ Resolved</div>
-                ) : (
-                  <button
-                    onClick={() => handleResolveFault(f.id)}
-                    disabled={resolvingFault === f.id}
-                    style={{ ...btnBase, background: 'rgba(29,158,117,0.12)', color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)', marginTop: 4, opacity: resolvingFault === f.id ? 0.5 : 1 }}
-                  >
-                    {resolvingFault === f.id ? '…' : '✓ Mark resolved'}
-                  </button>
-                )}
+                {f.description && <div style={{ fontSize: 11, color: 'rgba(239,159,39,0.85)', marginBottom: 8 }}>{f.description}</div>}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {!f.resolved && (
+                    <button
+                      onClick={() => handleResolveFault(f.id)}
+                      disabled={resolvingFault === f.id}
+                      style={{ ...btnBase, background: 'rgba(29,158,117,0.12)', color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)', opacity: resolvingFault === f.id ? 0.5 : 1 }}
+                    >
+                      {resolvingFault === f.id ? '…' : '✓ Mark resolved'}
+                    </button>
+                  )}
+                  {f.resolved && <div style={{ fontSize: 10, color: 'var(--teal)', alignSelf: 'center' }}>✓ Resolved</div>}
+                  {f.forwarded_to_maintenance ? (
+                    <div style={{ fontSize: 10, color: 'var(--mint)', alignSelf: 'center' }}>✓ Forwarded</div>
+                  ) : (
+                    <button
+                      onClick={() => handleForwardFault(f.id, f)}
+                      disabled={forwardingFault === f.id}
+                      style={{ ...btnBase, background: 'rgba(55,138,221,0.1)', color: '#85B7EB', border: '0.5px solid rgba(55,138,221,0.25)', opacity: forwardingFault === f.id ? 0.5 : 1 }}
+                    >
+                      {forwardingFault === f.id ? '…' : '📧 Forward to maintenance'}
+                    </button>
+                  )}
+                  {(f.resolved || f.forwarded_to_maintenance) && (
+                    <button
+                      onClick={() => handleArchiveFault(f.id)}
+                      disabled={archivingFault === f.id}
+                      style={{ ...btnBase, background: 'rgba(226,75,74,0.08)', color: 'rgba(247,193,193,0.6)', border: '0.5px solid rgba(226,75,74,0.2)', opacity: archivingFault === f.id ? 0.5 : 1 }}
+                    >
+                      {archivingFault === f.id ? '…' : 'Archive'}
+                    </button>
+                  )}
+                </div>
               </div>
             ))
+          )}
+
+          {archivedFaults.length > 0 && (
+            <div style={{ marginTop: 4 }}>
+              <button
+                onClick={() => setShowArchivedFaults((v) => !v)}
+                style={{ ...btnBase, background: 'none', color: 'var(--text3)', border: '0.5px solid rgba(29,158,117,0.15)', width: '100%', padding: '6px 0', marginBottom: showArchivedFaults ? 8 : 0 }}
+              >
+                {showArchivedFaults ? `Hide archived (${archivedFaults.length})` : `Show archived (${archivedFaults.length})`}
+              </button>
+              {showArchivedFaults && archivedFaults.map((f) => (
+                <div key={f.id} style={{ background: 'var(--al)', border: '0.5px solid var(--ab)', borderRadius: 'var(--rads)', padding: '10px 14px', marginBottom: 8, opacity: 0.4 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--amber-t)' }}>{f.fault_type}{f.bay_num != null ? ` — Bay ${f.bay_num}` : ''}</div>
+                  {f.description && <div style={{ fontSize: 11, color: 'rgba(239,159,39,0.7)', marginTop: 3 }}>{f.description}</div>}
+                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Archived · {timeAgo(f.reported_at)}</div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -283,7 +354,7 @@ export default function AdminReportsPage() {
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--teal)', marginBottom: f.notes ? 4 : 8 }}>{f.reason}</div>
                 {f.notes && <div style={{ fontSize: 11, color: 'var(--mint)', marginBottom: 8 }}>{f.notes}</div>}
-                <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button
                     onClick={() => handleMarkActioned(f.id)}
                     disabled={actioning === f.id}
@@ -298,11 +369,11 @@ export default function AdminReportsPage() {
                     ✉ Contact site
                   </a>
                   <button
-                    onClick={() => handleDelete(f.id, f.station_name)}
-                    disabled={deleting === f.id}
-                    style={{ ...btnBase, background: 'rgba(226,75,74,0.1)', color: '#F7C1C1', border: '0.5px solid rgba(226,75,74,0.25)', opacity: deleting === f.id ? 0.5 : 1 }}
+                    onClick={() => handleArchiveFlag(f.id)}
+                    disabled={archivingFlag === f.id}
+                    style={{ ...btnBase, background: 'rgba(226,75,74,0.08)', color: 'rgba(247,193,193,0.6)', border: '0.5px solid rgba(226,75,74,0.2)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
                   >
-                    {deleting === f.id ? '...' : 'Delete'}
+                    {archivingFlag === f.id ? '...' : 'Archive'}
                   </button>
                 </div>
               </div>
@@ -327,12 +398,33 @@ export default function AdminReportsPage() {
                   <div style={{ fontSize: 11, color: 'var(--teal)', marginBottom: f.notes ? 4 : 8 }}>{f.reason}</div>
                   {f.notes && <div style={{ fontSize: 11, color: 'var(--mint)', marginBottom: 8 }}>{f.notes}</div>}
                   <button
-                    onClick={() => handleDelete(f.id, f.station_name)}
-                    disabled={deleting === f.id}
-                    style={{ ...btnBase, background: 'rgba(226,75,74,0.1)', color: '#F7C1C1', border: '0.5px solid rgba(226,75,74,0.25)', opacity: deleting === f.id ? 0.5 : 1 }}
+                    onClick={() => handleArchiveFlag(f.id)}
+                    disabled={archivingFlag === f.id}
+                    style={{ ...btnBase, background: 'rgba(226,75,74,0.08)', color: 'rgba(247,193,193,0.6)', border: '0.5px solid rgba(226,75,74,0.2)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
                   >
-                    {deleting === f.id ? '...' : 'Delete'}
+                    {archivingFlag === f.id ? '...' : 'Archive'}
                   </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {archivedFlags.length > 0 && (
+            <div style={{ marginTop: 4 }}>
+              <button
+                onClick={() => setShowArchivedFlags((v) => !v)}
+                style={{ ...btnBase, background: 'none', color: 'var(--text3)', border: '0.5px solid rgba(226,75,74,0.15)', width: '100%', padding: '6px 0', marginBottom: showArchivedFlags ? 8 : 0 }}
+              >
+                {showArchivedFlags ? `Hide archived (${archivedFlags.length})` : `Show archived (${archivedFlags.length})`}
+              </button>
+              {showArchivedFlags && archivedFlags.map((f) => (
+                <div key={f.id} style={{ background: 'var(--bg3)', border: '0.5px solid rgba(226,75,74,0.08)', borderRadius: 'var(--rads)', padding: '10px 12px', marginBottom: 8, opacity: 0.35 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--cream)' }}>{f.station_name}</div>
+                    <div style={{ fontSize: 10, color: 'rgba(247,193,193,0.4)' }}>Archived</div>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--teal)' }}>{f.reason}</div>
+                  {f.notes && <div style={{ fontSize: 11, color: 'var(--mint)', marginTop: 3 }}>{f.notes}</div>}
                 </div>
               ))}
             </div>

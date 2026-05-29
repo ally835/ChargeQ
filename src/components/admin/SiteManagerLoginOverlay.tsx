@@ -22,8 +22,8 @@ export function SiteManagerLoginOverlay({ onClose }: SiteManagerLoginOverlayProp
   const [changePinErr, setChangePinErr] = useState('')
 
   const {
-    step, loading, error, clearError,
-    checkEmail, verifyPin, changePin, goBackToEmail,
+    step, loading, error, clearError, lockSecsLeft,
+    checkEmail, verifyPin, changePin, goBackToEmail, requestPinReset,
   } = useSiteManagerLogin()
 
   // ── Registration views ────────────────────────────────────────────
@@ -246,6 +246,39 @@ export function SiteManagerLoginOverlay({ onClose }: SiteManagerLoginOverlayProp
             }}
           >
             {loading ? 'Saving...' : 'Save PIN & continue →'}
+          </button>
+        </div>
+      )}
+
+      {/* Locked step */}
+      {step === 'locked' && (
+        <div style={panelStyle}>
+          <span style={{ fontSize: 48, display: 'block', marginBottom: 14 }}>🔐</span>
+          <div style={{ fontFamily: 'Syne, sans-serif', fontSize: 18, fontWeight: 800, color: '#F7C1C1', marginBottom: 6 }}>
+            Too many attempts
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--mint)', lineHeight: 1.6, marginBottom: 20 }}>
+            Your account is temporarily locked after {3} incorrect PINs.
+            {lockSecsLeft > 60
+              ? ` Try again in ${Math.ceil(lockSecsLeft / 60)} minutes.`
+              : ` Try again in ${lockSecsLeft} seconds.`}
+          </div>
+          <button
+            onClick={requestPinReset}
+            style={{
+              width: '100%', height: 48, border: 'none',
+              background: 'var(--g)', color: '#fff',
+              fontFamily: 'Syne, sans-serif', fontSize: 14, fontWeight: 700,
+              borderRadius: 'var(--rads)', cursor: 'pointer', marginBottom: 12,
+            }}
+          >
+            📧 Request PIN Reset
+          </button>
+          <button
+            onClick={goBackToEmail}
+            style={{ background: 'none', border: 'none', color: 'var(--mint)', fontFamily: '"DM Sans", sans-serif', fontSize: 12, cursor: 'pointer', padding: 8 }}
+          >
+            ← Use a different email
           </button>
         </div>
       )}
