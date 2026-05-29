@@ -134,7 +134,13 @@ export default function AdminReportsPage() {
     if (data) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any).rpc('archive_location_flag', { p_flag_id: id })
-      setFlags((prev) => prev.map((f) => f.id === id ? { ...f, actioned: true, archived: true } : f))
+      // Show "Archived" button state, then slide entry out after 2s
+      setFlags((prev) => prev.map((f) => f.id === id ? { ...f, actioned: true } : f))
+      setActioning(null)
+      setTimeout(() => {
+        setFlags((prev) => prev.map((f) => f.id === id ? { ...f, archived: true } : f))
+      }, 2000)
+      return
     }
     setActioning(null)
   }
@@ -175,8 +181,8 @@ export default function AdminReportsPage() {
   const activeFaults   = faults.filter((f) => !f.archived)
   const archivedFaults = faults.filter((f) => f.archived)
 
-  const openFlags     = flags.filter((f) => !f.actioned && !f.archived)
-  const actionedFlags = flags.filter((f) => f.actioned && !f.archived)
+  const openFlags     = flags.filter((f) => !f.archived)           // includes transitioning actioned entries
+  const actionedFlags = flags.filter((f) => f.actioned && !f.archived)  // (kept for legacy, now always empty after transition)
   const archivedFlags = flags.filter((f) => f.archived)
 
   const chargerCounts: Record<string, number> = {}
@@ -359,26 +365,34 @@ export default function AdminReportsPage() {
                 <div style={{ fontSize: 11, color: 'var(--teal)', marginBottom: f.notes ? 4 : 8 }}>{f.reason}</div>
                 {f.notes && <div style={{ fontSize: 11, color: 'var(--mint)', marginBottom: 8 }}>{f.notes}</div>}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => handleMarkActioned(f.id)}
-                    disabled={actioning === f.id}
-                    style={{ ...btnBase, background: 'var(--gc)', color: 'var(--teal)', border: '0.5px solid var(--gb)', opacity: actioning === f.id ? 0.5 : 1 }}
-                  >
-                    {actioning === f.id ? '...' : '✓ Mark actioned'}
-                  </button>
-                  <a
-                    href={`mailto:hello@chargeq.com.au?subject=Site%20outreach%3A%20${encodeURIComponent(f.station_name)}&body=Hi%2C%0A%0AWe%20received%20a%20flag%20for%20${encodeURIComponent(f.station_name)}%20(${encodeURIComponent(f.reason)}).%0A%0A`}
-                    style={{ ...btnBase, background: 'rgba(29,158,117,0.1)', color: 'var(--mint)', border: '0.5px solid rgba(29,158,117,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-                  >
-                    ✉ Contact site
-                  </a>
-                  <button
-                    onClick={() => handleArchiveFlag(f.id)}
-                    disabled={archivingFlag === f.id}
-                    style={{ ...btnBase, background: 'rgba(226,75,74,0.08)', color: 'rgba(247,193,193,0.6)', border: '0.5px solid rgba(226,75,74,0.2)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
-                  >
-                    {archivingFlag === f.id ? '...' : 'Archive'}
-                  </button>
+                  {f.actioned ? (
+                    <div style={{ ...btnBase, background: 'rgba(29,158,117,0.15)', color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)', cursor: 'default', fontSize: 11 }}>
+                      ✓ Archived
+                    </div>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => handleMarkActioned(f.id)}
+                        disabled={actioning === f.id}
+                        style={{ ...btnBase, background: 'var(--gc)', color: 'var(--teal)', border: '0.5px solid var(--gb)', opacity: actioning === f.id ? 0.5 : 1 }}
+                      >
+                        {actioning === f.id ? '...' : '✓ Mark actioned'}
+                      </button>
+                      <a
+                        href={`mailto:hello@chargeq.com.au?subject=Site%20outreach%3A%20${encodeURIComponent(f.station_name)}&body=Hi%2C%0A%0AWe%20received%20a%20flag%20for%20${encodeURIComponent(f.station_name)}%20(${encodeURIComponent(f.reason)}).%0A%0A`}
+                        style={{ ...btnBase, background: 'rgba(29,158,117,0.1)', color: 'var(--mint)', border: '0.5px solid rgba(29,158,117,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                      >
+                        ✉ Contact site
+                      </a>
+                      <button
+                        onClick={() => handleArchiveFlag(f.id)}
+                        disabled={archivingFlag === f.id}
+                        style={{ ...btnBase, background: 'rgba(226,75,74,0.08)', color: 'rgba(247,193,193,0.6)', border: '0.5px solid rgba(226,75,74,0.2)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
+                      >
+                        {archivingFlag === f.id ? '...' : 'Archive'}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             ))
