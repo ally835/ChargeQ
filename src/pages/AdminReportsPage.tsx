@@ -258,7 +258,11 @@ export default function AdminReportsPage() {
                 </div>
                 {f.description && <div style={{ fontSize: 11, color: 'rgba(239,159,39,0.85)', marginBottom: 8 }}>{f.description}</div>}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {!f.resolved && (
+                  {f.resolved ? (
+                    <div style={{ ...btnBase, background: 'rgba(29,158,117,0.2)', color: 'var(--g)', border: '0.5px solid rgba(29,158,117,0.4)', cursor: 'default', pointerEvents: 'none' }}>
+                      ✓ Resolved
+                    </div>
+                  ) : (
                     <button
                       onClick={() => handleResolveFault(f.id)}
                       disabled={resolvingFault === f.id}
@@ -267,7 +271,6 @@ export default function AdminReportsPage() {
                       {resolvingFault === f.id ? '…' : '✓ Mark resolved'}
                     </button>
                   )}
-                  {f.resolved && <div style={{ fontSize: 10, color: 'var(--teal)', alignSelf: 'center' }}>✓ Resolved</div>}
                   {f.forwarded_to_maintenance ? (
                     <div style={{ fontSize: 10, color: 'var(--mint)', alignSelf: 'center' }}>✓ Forwarded</div>
                   ) : (
@@ -279,15 +282,13 @@ export default function AdminReportsPage() {
                       {forwardingFault === f.id ? '…' : '📧 Forward to maintenance'}
                     </button>
                   )}
-                  {(f.resolved || f.forwarded_to_maintenance) && (
-                    <button
-                      onClick={() => handleArchiveFault(f.id)}
-                      disabled={archivingFault === f.id}
-                      style={{ ...btnBase, background: 'rgba(226,75,74,0.08)', color: 'rgba(247,193,193,0.6)', border: '0.5px solid rgba(226,75,74,0.2)', opacity: archivingFault === f.id ? 0.5 : 1 }}
-                    >
-                      {archivingFault === f.id ? '…' : 'Archive'}
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleArchiveFault(f.id)}
+                    disabled={archivingFault === f.id}
+                    style={{ ...btnBase, background: 'transparent', color: 'var(--text3)', border: '0.5px solid rgba(255,255,255,0.2)', opacity: archivingFault === f.id ? 0.5 : 1 }}
+                  >
+                    {archivingFault === f.id ? '…' : 'Archive'}
+                  </button>
                 </div>
               </div>
             ))
