@@ -55,7 +55,6 @@ export default function AdminReportsPage() {
   const [flags, setFlags] = useState<LocationFlag[]>([])
   const [flagsError, setFlagsError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const [showActioned, setShowActioned] = useState(false)
   const [showArchivedFlags, setShowArchivedFlags] = useState(false)
   const [showArchivedFaults, setShowArchivedFaults] = useState(false)
   const [actioning, setActioning] = useState<string | null>(null)
@@ -68,6 +67,7 @@ export default function AdminReportsPage() {
   const [showArchivedBayTaken, setShowArchivedBayTaken] = useState(false)
   const [showFaults, setShowFaults] = useState(true)
   const [showBayTaken, setShowBayTaken] = useState(true)
+  const [showFlags, setShowFlags] = useState(true)
 
   async function fetchAll() {
     setRefreshing(true)
@@ -160,18 +160,7 @@ export default function AdminReportsPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any).rpc('mark_flag_actioned', { p_flag_id: id })
     if (error) console.error('[RPC error] mark_flag_actioned', error)
-    if (data) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { error: archErr } = await (supabase as any).rpc('archive_location_flag', { p_flag_id: id })
-      if (archErr) console.error('[RPC error] archive_location_flag (via handleMarkActioned)', archErr)
-      // Show "Archived" button state, then slide entry out after 2s
-      setFlags((prev) => prev.map((f) => f.id === id ? { ...f, actioned: true } : f))
-      setActioning(null)
-      setTimeout(() => {
-        setFlags((prev) => prev.map((f) => f.id === id ? { ...f, archived: true } : f))
-      }, 2000)
-      return
-    }
+    if (data) setFlags((prev) => prev.map((f) => f.id === id ? { ...f, actioned: true } : f))
     setActioning(null)
   }
 
@@ -214,8 +203,7 @@ export default function AdminReportsPage() {
   const activeBayTaken   = bayTaken.filter((bt) => !bt.archived)
   const archivedBayTaken = bayTaken.filter((bt) => bt.archived)
 
-  const openFlags     = flags.filter((f) => !f.archived)           // includes transitioning actioned entries
-  const actionedFlags = flags.filter((f) => f.actioned && !f.archived)  // (kept for legacy, now always empty after transition)
+  const openFlags     = flags.filter((f) => !f.archived)
   const archivedFlags = flags.filter((f) => f.archived)
 
   const chargerCounts: Record<string, number> = {}
@@ -409,7 +397,7 @@ export default function AdminReportsPage() {
       {/* Location flags — SA only */}
       {isSuperAdmin && (
         <div style={{ background: 'var(--surf)', border: '0.5px solid rgba(29,158,117,0.18)', borderRadius: 'var(--rad)', padding: 14, marginBottom: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: showFlags ? 8 : 0 }}>
             <div className="section-label" style={{ margin: 0 }}>Location flags</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 10, color: 'var(--text3)' }}>Warm outreach leads</span>
@@ -417,112 +405,98 @@ export default function AdminReportsPage() {
                 style={{ background: 'var(--gc)', border: '0.5px solid var(--gb)', borderRadius: 6, padding: '3px 8px', fontSize: 11, color: 'var(--teal)', cursor: 'pointer', fontFamily: '"DM Sans", sans-serif' }}>
                 {refreshing ? '...' : '↻ Refresh'}
               </button>
+              <button onClick={() => setShowFlags((v) => !v)} style={{ background: 'none', border: 'none', color: 'var(--text3)', fontSize: 11, cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}>
+                {showFlags ? '▲' : '▼'}
+              </button>
             </div>
           </div>
 
-          {flagsError && (
-            <div style={{ background: 'var(--al)', border: '0.5px solid var(--ab)', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: 'var(--amber-t)', marginBottom: 8 }}>
-              ⚠ Could not load flags: {flagsError}
-            </div>
-          )}
-
-          <p style={{ fontSize: 12, color: 'var(--mint)', lineHeight: 1.6, marginBottom: 10 }}>
-            Sites reported by users as needing ChargeQ. Use these to reach out to site owners.
-          </p>
-
-          {openFlags.length === 0 ? (
-            <p style={{ fontSize: 12, color: 'var(--mint)', textAlign: 'center', padding: 12 }}>No open flags.</p>
-          ) : (
-            openFlags.map((f) => (
-              <div key={f.id} style={{ background: 'var(--bg3)', border: '0.5px solid rgba(29,158,117,0.15)', borderRadius: 'var(--rads)', padding: '10px 12px', marginBottom: 8 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--cream)' }}>{f.station_name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text3)' }}>{timeAgo(f.reported_at)}</div>
+          {showFlags && (
+            <>
+              {flagsError && (
+                <div style={{ background: 'var(--al)', border: '0.5px solid var(--ab)', borderRadius: 8, padding: '8px 12px', fontSize: 11, color: 'var(--amber-t)', marginBottom: 8 }}>
+                  ⚠ Could not load flags: {flagsError}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--teal)', marginBottom: f.notes ? 4 : 8 }}>{f.reason}</div>
-                {f.notes && <div style={{ fontSize: 11, color: 'var(--mint)', marginBottom: 8 }}>{f.notes}</div>}
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {f.actioned ? (
-                    <div style={{ ...btnBase, background: 'rgba(29,158,117,0.15)', color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)', cursor: 'default', fontSize: 11 }}>
-                      ✓ Archived
+              )}
+
+              <p style={{ fontSize: 12, color: 'var(--mint)', lineHeight: 1.6, marginBottom: 10 }}>
+                Sites reported by users as needing ChargeQ. Use these to reach out to site owners.
+              </p>
+
+              {openFlags.length === 0 ? (
+                <p style={{ fontSize: 12, color: 'var(--mint)', textAlign: 'center', padding: 12 }}>No open flags.</p>
+              ) : (
+                openFlags.map((f) => (
+                  <div key={f.id} style={{ background: 'var(--bg3)', border: '0.5px solid rgba(29,158,117,0.15)', borderRadius: 'var(--rads)', padding: '10px 12px', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--cream)' }}>{f.station_name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text3)' }}>{timeAgo(f.reported_at)}</div>
                     </div>
-                  ) : (
-                    <>
-                      <button
-                        onClick={() => handleMarkActioned(f.id)}
-                        disabled={actioning === f.id}
-                        style={{ ...btnBase, background: 'var(--gc)', color: 'var(--teal)', border: '0.5px solid var(--gb)', opacity: actioning === f.id ? 0.5 : 1 }}
-                      >
-                        {actioning === f.id ? '...' : '✓ Mark actioned'}
-                      </button>
-                      <a
-                        href={`mailto:hello@chargeq.com.au?subject=Site%20outreach%3A%20${encodeURIComponent(f.station_name)}&body=Hi%2C%0A%0AWe%20received%20a%20flag%20for%20${encodeURIComponent(f.station_name)}%20(${encodeURIComponent(f.reason)}).%0A%0A`}
-                        style={{ ...btnBase, background: 'rgba(29,158,117,0.1)', color: 'var(--mint)', border: '0.5px solid rgba(29,158,117,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-                      >
-                        ✉ Contact site
-                      </a>
-                      <button
-                        onClick={() => handleArchiveFlag(f.id)}
-                        disabled={archivingFlag === f.id}
-                        style={{ ...btnBase, background: 'rgba(226,75,74,0.08)', color: 'rgba(247,193,193,0.6)', border: '0.5px solid rgba(226,75,74,0.2)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
-                      >
-                        {archivingFlag === f.id ? '...' : 'Archive'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-
-          {actionedFlags.length > 0 && (
-            <div style={{ marginTop: 4 }}>
-              <button
-                onClick={() => setShowActioned((v) => !v)}
-                style={{ ...btnBase, background: 'none', color: 'var(--text3)', border: '0.5px solid rgba(29,158,117,0.15)', width: '100%', padding: '6px 0', marginBottom: showActioned ? 8 : 0 }}
-              >
-                {showActioned ? `Hide actioned (${actionedFlags.length})` : `Show actioned (${actionedFlags.length})`}
-              </button>
-
-              {showActioned && actionedFlags.map((f) => (
-                <div key={f.id} style={{ background: 'var(--bg3)', border: '0.5px solid rgba(29,158,117,0.08)', borderRadius: 'var(--rads)', padding: '10px 12px', marginBottom: 8, opacity: 0.5 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--cream)' }}>{f.station_name}</div>
-                    <div style={{ fontSize: 10, color: 'var(--teal)' }}>✓ actioned</div>
+                    <div style={{ fontSize: 11, color: 'var(--teal)', marginBottom: f.notes ? 4 : 8 }}>{f.reason}</div>
+                    {f.notes && <div style={{ fontSize: 11, color: 'var(--mint)', marginBottom: 8 }}>{f.notes}</div>}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      {f.actioned ? (
+                        <>
+                          <div style={{ ...btnBase, background: 'rgba(29,158,117,0.2)', color: 'var(--g)', border: '0.5px solid rgba(29,158,117,0.4)', cursor: 'default', fontSize: 11 }}>
+                            ✓ Actioned
+                          </div>
+                          <a
+                            href={`mailto:hello@chargeq.com.au?subject=Site%20outreach%3A%20${encodeURIComponent(f.station_name)}&body=Hi%2C%0A%0AWe%20received%20a%20flag%20for%20${encodeURIComponent(f.station_name)}%20(${encodeURIComponent(f.reason)}).%0A%0A`}
+                            style={{ ...btnBase, background: 'rgba(29,158,117,0.1)', color: 'var(--mint)', border: '0.5px solid rgba(29,158,117,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                          >
+                            ✉ Contact site
+                          </a>
+                          <button
+                            onClick={() => handleArchiveFlag(f.id)}
+                            disabled={archivingFlag === f.id}
+                            style={{ ...btnBase, background: 'transparent', color: 'var(--text3)', border: '0.5px solid rgba(255,255,255,0.2)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
+                          >
+                            {archivingFlag === f.id ? '...' : 'Archive'}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleMarkActioned(f.id)}
+                            disabled={actioning === f.id}
+                            style={{ ...btnBase, background: 'var(--gc)', color: 'var(--teal)', border: '0.5px solid var(--gb)', opacity: actioning === f.id ? 0.5 : 1 }}
+                          >
+                            {actioning === f.id ? '...' : '✓ Mark actioned'}
+                          </button>
+                          <a
+                            href={`mailto:hello@chargeq.com.au?subject=Site%20outreach%3A%20${encodeURIComponent(f.station_name)}&body=Hi%2C%0A%0AWe%20received%20a%20flag%20for%20${encodeURIComponent(f.station_name)}%20(${encodeURIComponent(f.reason)}).%0A%0A`}
+                            style={{ ...btnBase, background: 'rgba(29,158,117,0.1)', color: 'var(--mint)', border: '0.5px solid rgba(29,158,117,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                          >
+                            ✉ Contact site
+                          </a>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--teal)', marginBottom: f.notes ? 4 : 8 }}>{f.reason}</div>
-                  {f.notes && <div style={{ fontSize: 11, color: 'var(--mint)', marginBottom: 8 }}>{f.notes}</div>}
+                ))
+              )}
+
+              {archivedFlags.length > 0 && (
+                <div style={{ marginTop: 4 }}>
                   <button
-                    onClick={() => handleArchiveFlag(f.id)}
-                    disabled={archivingFlag === f.id}
-                    style={{ ...btnBase, background: 'rgba(226,75,74,0.08)', color: 'rgba(247,193,193,0.6)', border: '0.5px solid rgba(226,75,74,0.2)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
+                    onClick={() => setShowArchivedFlags((v) => !v)}
+                    style={{ ...btnBase, background: 'none', color: 'var(--text3)', border: '0.5px solid rgba(226,75,74,0.15)', width: '100%', padding: '6px 0', marginBottom: showArchivedFlags ? 8 : 0 }}
                   >
-                    {archivingFlag === f.id ? '...' : 'Archive'}
+                    {showArchivedFlags ? `Hide archived (${archivedFlags.length})` : `Show archived (${archivedFlags.length})`}
                   </button>
+                  {showArchivedFlags && archivedFlags.map((f) => (
+                    <div key={f.id} style={{ background: 'var(--bg3)', border: '0.5px solid rgba(226,75,74,0.08)', borderRadius: 'var(--rads)', padding: '10px 12px', marginBottom: 8, opacity: 0.35 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--cream)' }}>{f.station_name}</div>
+                        <div style={{ fontSize: 10, color: 'rgba(247,193,193,0.4)' }}>Archived</div>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--teal)' }}>{f.reason}</div>
+                      {f.notes && <div style={{ fontSize: 11, color: 'var(--mint)', marginTop: 3 }}>{f.notes}</div>}
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          )}
-
-          {archivedFlags.length > 0 && (
-            <div style={{ marginTop: 4 }}>
-              <button
-                onClick={() => setShowArchivedFlags((v) => !v)}
-                style={{ ...btnBase, background: 'none', color: 'var(--text3)', border: '0.5px solid rgba(226,75,74,0.15)', width: '100%', padding: '6px 0', marginBottom: showArchivedFlags ? 8 : 0 }}
-              >
-                {showArchivedFlags ? `Hide archived (${archivedFlags.length})` : `Show archived (${archivedFlags.length})`}
-              </button>
-              {showArchivedFlags && archivedFlags.map((f) => (
-                <div key={f.id} style={{ background: 'var(--bg3)', border: '0.5px solid rgba(226,75,74,0.08)', borderRadius: 'var(--rads)', padding: '10px 12px', marginBottom: 8, opacity: 0.35 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--cream)' }}>{f.station_name}</div>
-                    <div style={{ fontSize: 10, color: 'rgba(247,193,193,0.4)' }}>Archived</div>
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--teal)' }}>{f.reason}</div>
-                  {f.notes && <div style={{ fontSize: 11, color: 'var(--mint)', marginTop: 3 }}>{f.notes}</div>}
-                </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       )}
