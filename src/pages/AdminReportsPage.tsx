@@ -351,7 +351,11 @@ export default function AdminReportsPage() {
                   )}
                   {bt.notes && <div style={{ fontSize: 11, color: 'rgba(247,193,193,0.7)', marginTop: 3 }}>{bt.notes}</div>}
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                    {!bt.resolved && (
+                    {bt.resolved ? (
+                      <div style={{ ...btnBase, background: 'rgba(29,158,117,0.2)', color: 'var(--g)', border: '0.5px solid rgba(29,158,117,0.4)', cursor: 'default', pointerEvents: 'none' }}>
+                        ✓ Resolved
+                      </div>
+                    ) : (
                       <button
                         onClick={() => handleResolveBayTaken(bt.id)}
                         disabled={resolvingBayTaken === bt.id}
@@ -360,16 +364,13 @@ export default function AdminReportsPage() {
                         {resolvingBayTaken === bt.id ? '…' : '✓ Mark resolved'}
                       </button>
                     )}
-                    {bt.resolved && <div style={{ fontSize: 10, color: 'var(--teal)', alignSelf: 'center' }}>✓ Resolved</div>}
-                    {bt.resolved && (
-                      <button
-                        onClick={() => handleArchiveBayTaken(bt.id)}
-                        disabled={archivingBayTaken === bt.id}
-                        style={{ ...btnBase, background: 'rgba(226,75,74,0.08)', color: 'rgba(247,193,193,0.6)', border: '0.5px solid rgba(226,75,74,0.2)', opacity: archivingBayTaken === bt.id ? 0.5 : 1 }}
-                      >
-                        {archivingBayTaken === bt.id ? '…' : 'Archive'}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleArchiveBayTaken(bt.id)}
+                      disabled={archivingBayTaken === bt.id}
+                      style={{ ...btnBase, background: 'transparent', color: 'var(--text3)', border: '0.5px solid rgba(255,255,255,0.2)', opacity: archivingBayTaken === bt.id ? 0.5 : 1 }}
+                    >
+                      {archivingBayTaken === bt.id ? '…' : 'Archive'}
+                    </button>
                   </div>
                 </div>
               )
