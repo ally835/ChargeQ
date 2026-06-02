@@ -5,7 +5,7 @@ import { useQueueStore } from '@/store/queueStore'
 import { AdminBadge } from '@/components/admin/AdminBadge'
 
 interface FaultReport { id: string; bay_num: number|null; fault_type: string; description: string|null; reported_at: string; resolved: boolean; archived: boolean; forwarded_to_maintenance: boolean }
-interface BayTakenIncident { id: string; assigned_bay: number; offender_plate: string|null; fault_type?: string|null; notes: string|null; reported_at: string }
+interface BayTakenIncident { id: string; assigned_bay: number; offender_plate: string|null; fault_type?: string|null; notes: string|null; reported_at: string; resolved: boolean; archived: boolean }
 interface LocationFlag { id: string; station_name: string; reason: string; notes: string|null; reported_at: string; actioned: boolean; archived: boolean }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -63,6 +63,11 @@ export default function AdminReportsPage() {
   const [resolvingFault, setResolvingFault] = useState<string | null>(null)
   const [archivingFault, setArchivingFault] = useState<string | null>(null)
   const [forwardingFault, setForwardingFault] = useState<string | null>(null)
+  const [resolvingBayTaken, setResolvingBayTaken] = useState<string | null>(null)
+  const [archivingBayTaken, setArchivingBayTaken] = useState<string | null>(null)
+  const [showArchivedBayTaken, setShowArchivedBayTaken] = useState(false)
+  const [showFaults, setShowFaults] = useState(true)
+  const [showBayTaken, setShowBayTaken] = useState(true)
 
   async function fetchAll() {
     setRefreshing(true)
@@ -127,6 +132,22 @@ export default function AdminReportsPage() {
     setForwardingFault(null)
   }
 
+  async function handleResolveBayTaken(id: string) {
+    setResolvingBayTaken(id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any).rpc('resolve_bay_taken_incident', { p_incident_id: id })
+    if (data) setBayTaken((prev) => prev.map((bt) => bt.id === id ? { ...bt, resolved: true } : bt))
+    setResolvingBayTaken(null)
+  }
+
+  async function handleArchiveBayTaken(id: string) {
+    setArchivingBayTaken(id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data } = await (supabase as any).rpc('archive_bay_taken_incident', { p_incident_id: id })
+    if (data) setBayTaken((prev) => prev.map((bt) => bt.id === id ? { ...bt, archived: true } : bt))
+    setArchivingBayTaken(null)
+  }
+
   async function handleMarkActioned(id: string) {
     setActioning(id)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -178,8 +199,10 @@ export default function AdminReportsPage() {
     downloadCSV(rows, `${siteInfo.name.replace(/\s+/g,'_')}_bay_taken_incidents.csv`)
   }
 
-  const activeFaults   = faults.filter((f) => !f.archived)
-  const archivedFaults = faults.filter((f) => f.archived)
+  const activeFaults     = faults.filter((f) => !f.archived)
+  const archivedFaults   = faults.filter((f) => f.archived)
+  const activeBayTaken   = bayTaken.filter((bt) => !bt.archived)
+  const archivedBayTaken = bayTaken.filter((bt) => bt.archived)
 
   const openFlags     = flags.filter((f) => !f.archived)           // includes transitioning actioned entries
   const actionedFlags = flags.filter((f) => f.actioned && !f.archived)  // (kept for legacy, now always empty after transition)
@@ -221,12 +244,15 @@ export default function AdminReportsPage() {
                   ↓ CSV
                 </button>
               )}
+              <button onClick={() => setShowFaults((v) => !v)} style={{ background: 'none', border: 'none', color: 'rgba(239,159,39,0.5)', fontSize: 11, cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}>
+                {showFaults ? '▲' : '▼'}
+              </button>
             </div>
           </div>
-          {activeFaults.length === 0 ? (
+          {showFaults && activeFaults.length === 0 && (
             <p style={{ fontSize: 12, color: 'var(--mint)', textAlign: 'center', padding: 8 }}>No faults reported.</p>
-          ) : (
-            activeFaults.map((f) => (
+          )}
+          {showFaults && activeFaults.length > 0 && activeFaults.map((f) => (
               <div key={f.id} style={{ background: 'var(--al)', border: '0.5px solid var(--ab)', borderLeft: '3px solid var(--a)', borderRadius: 'var(--rads)', padding: '12px 14px', marginBottom: 8, opacity: f.resolved ? 0.55 : 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--amber-t)' }}>{f.fault_type}{f.bay_num != null ? ` — Bay ${f.bay_num}` : ''}</div>
@@ -267,9 +293,9 @@ export default function AdminReportsPage() {
                 </div>
               </div>
             ))
-          )}
+          }
 
-          {archivedFaults.length > 0 && (
+          {showFaults && archivedFaults.length > 0 && (
             <div style={{ marginTop: 4 }}>
               <button
                 onClick={() => setShowArchivedFaults((v) => !v)}
@@ -295,21 +321,24 @@ export default function AdminReportsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
             <div style={{ fontSize: 10, fontWeight: 500, color: '#F7C1C1', letterSpacing: '0.1em', textTransform: 'uppercase' }}>🚫 Bay taken incidents</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 10, color: 'rgba(247,193,193,0.6)' }}>{bayTaken.length > 0 ? `${bayTaken.length} reported` : 'None reported'}</span>
+              <span style={{ fontSize: 10, color: 'rgba(247,193,193,0.6)' }}>{activeBayTaken.length > 0 ? `${activeBayTaken.length} reported` : 'None reported'}</span>
               {bayTaken.length > 0 && (
                 <button onClick={exportBayTakenCSV} style={{ ...btnBase, background: 'var(--gc)', color: 'var(--teal)', border: '0.5px solid var(--gb)', padding: '3px 8px' }}>
                   ↓ CSV
                 </button>
               )}
+              <button onClick={() => setShowBayTaken((v) => !v)} style={{ background: 'none', border: 'none', color: 'rgba(247,193,193,0.4)', fontSize: 11, cursor: 'pointer', padding: '2px 4px', lineHeight: 1 }}>
+                {showBayTaken ? '▲' : '▼'}
+              </button>
             </div>
           </div>
-          {bayTaken.length === 0 ? (
+          {showBayTaken && (activeBayTaken.length === 0 ? (
             <p style={{ fontSize: 12, color: 'var(--mint)', textAlign: 'center', padding: 8 }}>No incidents reported.</p>
           ) : (
-            bayTaken.map((bt) => {
+            activeBayTaken.map((bt) => {
               const relatedFault = faults.find((f) => f.bay_num === bt.assigned_bay)
               return (
-                <div key={bt.id} style={{ background: 'var(--rl)', border: '0.5px solid var(--rb)', borderLeft: '3px solid var(--r)', borderRadius: 'var(--rads)', padding: '12px 14px', marginBottom: 8 }}>
+                <div key={bt.id} style={{ background: 'var(--rl)', border: '0.5px solid var(--rb)', borderLeft: '3px solid var(--r)', borderRadius: 'var(--rads)', padding: '12px 14px', marginBottom: 8, opacity: bt.resolved ? 0.55 : 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                     <div style={{ fontSize: 13, fontWeight: 500, color: '#F7C1C1' }}>Bay {bt.assigned_bay} taken</div>
                     <div style={{ fontSize: 10, color: 'rgba(247,193,193,0.5)' }}>{timeAgo(bt.reported_at)}</div>
@@ -322,9 +351,47 @@ export default function AdminReportsPage() {
                     </div>
                   )}
                   {bt.notes && <div style={{ fontSize: 11, color: 'rgba(247,193,193,0.7)', marginTop: 3 }}>{bt.notes}</div>}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    {!bt.resolved && (
+                      <button
+                        onClick={() => handleResolveBayTaken(bt.id)}
+                        disabled={resolvingBayTaken === bt.id}
+                        style={{ ...btnBase, background: 'rgba(29,158,117,0.12)', color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)', opacity: resolvingBayTaken === bt.id ? 0.5 : 1 }}
+                      >
+                        {resolvingBayTaken === bt.id ? '…' : '✓ Mark resolved'}
+                      </button>
+                    )}
+                    {bt.resolved && <div style={{ fontSize: 10, color: 'var(--teal)', alignSelf: 'center' }}>✓ Resolved</div>}
+                    {bt.resolved && (
+                      <button
+                        onClick={() => handleArchiveBayTaken(bt.id)}
+                        disabled={archivingBayTaken === bt.id}
+                        style={{ ...btnBase, background: 'rgba(226,75,74,0.08)', color: 'rgba(247,193,193,0.6)', border: '0.5px solid rgba(226,75,74,0.2)', opacity: archivingBayTaken === bt.id ? 0.5 : 1 }}
+                      >
+                        {archivingBayTaken === bt.id ? '…' : 'Archive'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             })
+          ))}
+          {showBayTaken && archivedBayTaken.length > 0 && (
+            <div style={{ marginTop: 4 }}>
+              <button
+                onClick={() => setShowArchivedBayTaken((v) => !v)}
+                style={{ ...btnBase, background: 'none', color: 'var(--text3)', border: '0.5px solid rgba(29,158,117,0.15)', width: '100%', padding: '6px 0', marginBottom: showArchivedBayTaken ? 8 : 0 }}
+              >
+                {showArchivedBayTaken ? `Hide archived (${archivedBayTaken.length})` : `Show archived (${archivedBayTaken.length})`}
+              </button>
+              {showArchivedBayTaken && archivedBayTaken.map((bt) => (
+                <div key={bt.id} style={{ background: 'var(--rl)', border: '0.5px solid var(--rb)', borderRadius: 'var(--rads)', padding: '10px 14px', marginBottom: 8, opacity: 0.4 }}>
+                  <div style={{ fontSize: 13, fontWeight: 500, color: '#F7C1C1' }}>Bay {bt.assigned_bay} taken</div>
+                  {bt.offender_plate && <div style={{ fontSize: 11, color: 'rgba(247,193,193,0.7)', marginTop: 3 }}>Offending plate: {bt.offender_plate}</div>}
+                  <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 4 }}>Archived · {timeAgo(bt.reported_at)}</div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
