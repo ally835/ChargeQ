@@ -59,10 +59,8 @@ export default function AdminReportsPage() {
   const [showArchivedFaults, setShowArchivedFaults] = useState(false)
   const [actioning, setActioning] = useState<string | null>(null)
   const [archivingFlag, setArchivingFlag] = useState<string | null>(null)
-  const [resolvingFault, setResolvingFault] = useState<string | null>(null)
   const [archivingFault, setArchivingFault] = useState<string | null>(null)
   const [forwardingFault, setForwardingFault] = useState<string | null>(null)
-  const [resolvingBayTaken, setResolvingBayTaken] = useState<string | null>(null)
   const [archivingBayTaken, setArchivingBayTaken] = useState<string | null>(null)
   const [showArchivedBayTaken, setShowArchivedBayTaken] = useState(false)
   const [showFaults, setShowFaults] = useState(true)
@@ -104,12 +102,10 @@ export default function AdminReportsPage() {
   useEffect(() => { fetchAll() }, [siteKey, isSuperAdmin]) // eslint-disable-line
 
   async function handleResolveFault(id: string) {
-    setResolvingFault(id)
+    setFaults((prev) => prev.map((f) => f.id === id ? { ...f, resolved: true } : f))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any).rpc('resolve_fault_report', { p_fault_id: id })
+    const { error } = await (supabase as any).rpc('resolve_fault_report', { p_fault_id: id })
     if (error) console.error('[RPC error] resolve_fault_report', error)
-    if (data) setFaults((prev) => prev.map((f) => f.id === id ? { ...f, resolved: true } : f))
-    setResolvingFault(null)
   }
 
   async function handleArchiveFault(id: string) {
@@ -138,12 +134,10 @@ export default function AdminReportsPage() {
   }
 
   async function handleResolveBayTaken(id: string) {
-    setResolvingBayTaken(id)
+    setBayTaken((prev) => prev.map((bt) => bt.id === id ? { ...bt, resolved: true } : bt))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any).rpc('resolve_bay_taken_incident', { p_incident_id: id })
+    const { error } = await (supabase as any).rpc('resolve_bay_taken_incident', { p_incident_id: id })
     if (error) console.error('[RPC error] resolve_bay_taken_incident', error)
-    if (data) setBayTaken((prev) => prev.map((bt) => bt.id === id ? { ...bt, resolved: true } : bt))
-    setResolvingBayTaken(null)
   }
 
   async function handleArchiveBayTaken(id: string) {
@@ -259,16 +253,13 @@ export default function AdminReportsPage() {
                 {f.description && <div style={{ fontSize: 11, color: 'rgba(239,159,39,0.85)', marginBottom: 8 }}>{f.description}</div>}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {f.resolved ? (
-                    <div style={{ ...btnBase, background: 'rgba(29,158,117,0.2)', color: 'var(--g)', border: '0.5px solid rgba(29,158,117,0.4)', cursor: 'default', pointerEvents: 'none' }}>
-                      ✓ Resolved
-                    </div>
+                    <span style={{ fontSize: 16, color: 'var(--g)', alignSelf: 'center', lineHeight: 1 }}>✓</span>
                   ) : (
                     <button
                       onClick={() => handleResolveFault(f.id)}
-                      disabled={resolvingFault === f.id}
-                      style={{ ...btnBase, background: 'rgba(29,158,117,0.12)', color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)', opacity: resolvingFault === f.id ? 0.5 : 1 }}
+                      style={{ ...btnBase, background: 'rgba(29,158,117,0.12)', color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)' }}
                     >
-                      {resolvingFault === f.id ? '…' : '✓ Mark resolved'}
+                      ✓ Mark resolved
                     </button>
                   )}
                   {f.forwarded_to_maintenance ? (
@@ -352,16 +343,13 @@ export default function AdminReportsPage() {
                   {bt.notes && <div style={{ fontSize: 11, color: 'rgba(247,193,193,0.7)', marginTop: 3 }}>{bt.notes}</div>}
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                     {bt.resolved ? (
-                      <div style={{ ...btnBase, background: 'rgba(29,158,117,0.2)', color: 'var(--g)', border: '0.5px solid rgba(29,158,117,0.4)', cursor: 'default', pointerEvents: 'none' }}>
-                        ✓ Resolved
-                      </div>
+                      <span style={{ fontSize: 16, color: 'var(--g)', alignSelf: 'center', lineHeight: 1 }}>✓</span>
                     ) : (
                       <button
                         onClick={() => handleResolveBayTaken(bt.id)}
-                        disabled={resolvingBayTaken === bt.id}
-                        style={{ ...btnBase, background: 'rgba(29,158,117,0.12)', color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)', opacity: resolvingBayTaken === bt.id ? 0.5 : 1 }}
+                        style={{ ...btnBase, background: 'rgba(29,158,117,0.12)', color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)' }}
                       >
-                        {resolvingBayTaken === bt.id ? '…' : '✓ Mark resolved'}
+                        ✓ Mark resolved
                       </button>
                     )}
                     <button
