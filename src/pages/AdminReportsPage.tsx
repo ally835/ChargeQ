@@ -276,7 +276,7 @@ export default function AdminReportsPage() {
                   <button
                     onClick={() => handleArchiveFault(f.id)}
                     disabled={archivingFault === f.id}
-                    style={{ ...btnBase, background: 'transparent', color: 'var(--text3)', border: '0.5px solid rgba(255,255,255,0.2)', opacity: archivingFault === f.id ? 0.5 : 1 }}
+                    style={{ ...btnBase, background: 'rgba(226,75,74,0.12)', color: 'rgba(247,193,193,0.8)', border: '0.5px solid rgba(226,75,74,0.35)', opacity: archivingFault === f.id ? 0.5 : 1 }}
                   >
                     {archivingFault === f.id ? '…' : 'Archive'}
                   </button>
@@ -355,7 +355,7 @@ export default function AdminReportsPage() {
                     <button
                       onClick={() => handleArchiveBayTaken(bt.id)}
                       disabled={archivingBayTaken === bt.id}
-                      style={{ ...btnBase, background: 'transparent', color: 'var(--text3)', border: '0.5px solid rgba(255,255,255,0.2)', opacity: archivingBayTaken === bt.id ? 0.5 : 1 }}
+                      style={{ ...btnBase, background: 'rgba(226,75,74,0.12)', color: 'rgba(247,193,193,0.8)', border: '0.5px solid rgba(226,75,74,0.35)', opacity: archivingBayTaken === bt.id ? 0.5 : 1 }}
                     >
                       {archivingBayTaken === bt.id ? '…' : 'Archive'}
                     </button>
@@ -439,7 +439,7 @@ export default function AdminReportsPage() {
                           <button
                             onClick={() => handleArchiveFlag(f.id)}
                             disabled={archivingFlag === f.id}
-                            style={{ ...btnBase, background: 'transparent', color: 'var(--text3)', border: '0.5px solid rgba(255,255,255,0.2)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
+                            style={{ ...btnBase, background: 'rgba(226,75,74,0.12)', color: 'rgba(247,193,193,0.8)', border: '0.5px solid rgba(226,75,74,0.35)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
                           >
                             {archivingFlag === f.id ? '...' : 'Archive'}
                           </button>
