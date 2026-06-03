@@ -109,10 +109,10 @@ export default function AdminReportsPage() {
 
   async function handleArchiveFault(id: string) {
     setArchivingFault(id)
+    setFaults((prev) => prev.map((f) => f.id === id ? { ...f, archived: true } : f))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any).rpc('archive_fault_report', { p_fault_id: id })
+    const { error } = await (supabase as any).rpc('archive_fault_report', { p_fault_id: id })
     if (error) console.error('[RPC error] archive_fault_report', error)
-    if (data) setFaults((prev) => prev.map((f) => f.id === id ? { ...f, archived: true } : f))
     setArchivingFault(null)
   }
 
@@ -141,10 +141,10 @@ export default function AdminReportsPage() {
 
   async function handleArchiveBayTaken(id: string) {
     setArchivingBayTaken(id)
+    setBayTaken((prev) => prev.map((bt) => bt.id === id ? { ...bt, archived: true } : bt))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any).rpc('archive_bay_taken_incident', { p_incident_id: id })
+    const { error } = await (supabase as any).rpc('archive_bay_taken_incident', { p_incident_id: id })
     if (error) console.error('[RPC error] archive_bay_taken_incident', error)
-    if (data) setBayTaken((prev) => prev.map((bt) => bt.id === id ? { ...bt, archived: true } : bt))
     setArchivingBayTaken(null)
   }
 
