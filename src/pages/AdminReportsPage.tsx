@@ -57,7 +57,6 @@ export default function AdminReportsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [showArchivedFlags, setShowArchivedFlags] = useState(false)
   const [showArchivedFaults, setShowArchivedFaults] = useState(false)
-  const [actioning, setActioning] = useState<string | null>(null)
   const [archivingFlag, setArchivingFlag] = useState<string | null>(null)
   const [archivingFault, setArchivingFault] = useState<string | null>(null)
   const [forwardingFault, setForwardingFault] = useState<string | null>(null)
@@ -150,21 +149,28 @@ export default function AdminReportsPage() {
   }
 
   async function handleMarkActioned(id: string) {
-    setActioning(id)
+    setFlags((prev) => prev.map((f) => f.id === id ? { ...f, actioned: true } : f))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any).rpc('mark_flag_actioned', { p_flag_id: id })
+    const { error } = await (supabase as any).rpc('mark_flag_actioned', { p_flag_id: id })
     if (error) console.error('[RPC error] mark_flag_actioned', error)
-    if (data) setFlags((prev) => prev.map((f) => f.id === id ? { ...f, actioned: true } : f))
-    setActioning(null)
   }
 
   async function handleArchiveFlag(id: string) {
     setArchivingFlag(id)
+    setFlags((prev) => prev.map((f) => f.id === id ? { ...f, archived: true } : f))
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any).rpc('archive_location_flag', { p_flag_id: id })
+    const { error } = await (supabase as any).rpc('archive_location_flag', { p_flag_id: id })
     if (error) console.error('[RPC error] archive_location_flag', error)
-    if (data) setFlags((prev) => prev.map((f) => f.id === id ? { ...f, archived: true } : f))
     setArchivingFlag(null)
+  }
+
+  function exportFlagsCSV() {
+    const rows: string[][] = [['Station', 'Reason', 'Notes', 'Reported', 'Resolved', 'Archived']]
+    flags.forEach((f) => rows.push([
+      f.station_name, f.reason, f.notes ?? '', new Date(f.reported_at).toLocaleString(),
+      f.actioned ? 'Yes' : 'No', f.archived ? 'Yes' : 'No',
+    ]))
+    downloadCSV(rows, 'chargeq_location_flags.csv')
   }
 
   function exportFaultsCSV() {
@@ -391,6 +397,11 @@ export default function AdminReportsPage() {
             <div className="section-label" style={{ margin: 0 }}>Location flags</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontSize: 10, color: 'var(--text3)' }}>Warm outreach leads</span>
+              {flags.length > 0 && (
+                <button onClick={exportFlagsCSV} style={{ background: 'var(--gc)', border: '0.5px solid var(--gb)', borderRadius: 6, padding: '3px 8px', fontSize: 11, color: 'var(--teal)', cursor: 'pointer', fontFamily: '"DM Sans", sans-serif' }}>
+                  ↓ CSV
+                </button>
+              )}
               <button onClick={fetchAll} disabled={refreshing}
                 style={{ background: 'var(--gc)', border: '0.5px solid var(--gb)', borderRadius: 6, padding: '3px 8px', fontSize: 11, color: 'var(--teal)', cursor: 'pointer', fontFamily: '"DM Sans", sans-serif' }}>
                 {refreshing ? '...' : '↻ Refresh'}
@@ -426,41 +437,28 @@ export default function AdminReportsPage() {
                     {f.notes && <div style={{ fontSize: 11, color: 'var(--mint)', marginBottom: 8 }}>{f.notes}</div>}
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {f.actioned ? (
-                        <>
-                          <div style={{ ...btnBase, background: 'rgba(29,158,117,0.2)', color: 'var(--g)', border: '0.5px solid rgba(29,158,117,0.4)', cursor: 'default', fontSize: 11 }}>
-                            ✓ Actioned
-                          </div>
-                          <a
-                            href={`mailto:hello@chargeq.com.au?subject=Site%20outreach%3A%20${encodeURIComponent(f.station_name)}&body=Hi%2C%0A%0AWe%20received%20a%20flag%20for%20${encodeURIComponent(f.station_name)}%20(${encodeURIComponent(f.reason)}).%0A%0A`}
-                            style={{ ...btnBase, background: 'rgba(29,158,117,0.1)', color: 'var(--mint)', border: '0.5px solid rgba(29,158,117,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-                          >
-                            ✉ Contact site
-                          </a>
-                          <button
-                            onClick={() => handleArchiveFlag(f.id)}
-                            disabled={archivingFlag === f.id}
-                            style={{ ...btnBase, background: 'rgba(226,75,74,0.12)', color: 'rgba(247,193,193,0.8)', border: '0.5px solid rgba(226,75,74,0.35)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
-                          >
-                            {archivingFlag === f.id ? '...' : 'Archive'}
-                          </button>
-                        </>
+                        <span style={{ fontSize: 16, color: 'var(--g)', alignSelf: 'center', lineHeight: 1 }}>✓</span>
                       ) : (
-                        <>
-                          <button
-                            onClick={() => handleMarkActioned(f.id)}
-                            disabled={actioning === f.id}
-                            style={{ ...btnBase, background: 'var(--gc)', color: 'var(--teal)', border: '0.5px solid var(--gb)', opacity: actioning === f.id ? 0.5 : 1 }}
-                          >
-                            {actioning === f.id ? '...' : '✓ Mark actioned'}
-                          </button>
-                          <a
-                            href={`mailto:hello@chargeq.com.au?subject=Site%20outreach%3A%20${encodeURIComponent(f.station_name)}&body=Hi%2C%0A%0AWe%20received%20a%20flag%20for%20${encodeURIComponent(f.station_name)}%20(${encodeURIComponent(f.reason)}).%0A%0A`}
-                            style={{ ...btnBase, background: 'rgba(29,158,117,0.1)', color: 'var(--mint)', border: '0.5px solid rgba(29,158,117,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
-                          >
-                            ✉ Contact site
-                          </a>
-                        </>
+                        <button
+                          onClick={() => handleMarkActioned(f.id)}
+                          style={{ ...btnBase, background: 'rgba(29,158,117,0.12)', color: 'var(--teal)', border: '0.5px solid rgba(29,158,117,0.3)' }}
+                        >
+                          ✓ Mark resolved
+                        </button>
                       )}
+                      <a
+                        href={`mailto:hello@chargeq.com.au?subject=Site%20outreach%3A%20${encodeURIComponent(f.station_name)}&body=Hi%2C%0A%0AWe%20received%20a%20flag%20for%20${encodeURIComponent(f.station_name)}%20(${encodeURIComponent(f.reason)}).%0A%0A`}
+                        style={{ ...btnBase, background: 'rgba(29,158,117,0.1)', color: 'var(--mint)', border: '0.5px solid rgba(29,158,117,0.25)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                      >
+                        ✉ Contact site
+                      </a>
+                      <button
+                        onClick={() => handleArchiveFlag(f.id)}
+                        disabled={archivingFlag === f.id}
+                        style={{ ...btnBase, background: 'rgba(226,75,74,0.12)', color: 'rgba(247,193,193,0.8)', border: '0.5px solid rgba(226,75,74,0.35)', opacity: archivingFlag === f.id ? 0.5 : 1 }}
+                      >
+                        {archivingFlag === f.id ? '...' : 'Archive'}
+                      </button>
                     </div>
                   </div>
                 ))
