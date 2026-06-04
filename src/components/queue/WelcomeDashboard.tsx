@@ -1,8 +1,11 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/authStore'
 import { useSignOut } from '@/hooks/useAuth'
+import { useAppStore, useToast } from '@/store/appStore'
 import { getUserInitials, CHARGER_INFO } from '@/utils'
 import type { Bay } from '@/types'
+import { FeedbackModal } from '@/components/ui/FeedbackModal'
 
 interface WelcomeDashboardProps {
   queueCount: number
@@ -40,9 +43,27 @@ export function WelcomeDashboard({
 }: WelcomeDashboardProps) {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
+  const siteKey = useAppStore((s) => s.siteKey)
   const { signOut } = useSignOut()
+  const toast = useToast()
+  const [showFeedback, setShowFeedback] = useState(false)
 
   if (!user) return null
+
+  async function handleShare() {
+    const url = window.location.origin
+    const text = 'Join me on ChargeQ — the smarter way to queue for EV charging'
+    if (navigator.share) {
+      try { await navigator.share({ title: 'ChargeQ', text, url }) } catch { /* cancelled */ }
+    } else {
+      try {
+        await navigator.clipboard.writeText(`${text}\n${url}`)
+        toast('Link copied to clipboard!')
+      } catch {
+        toast('Share not supported on this device.')
+      }
+    }
+  }
 
   const initials = getUserInitials(user.name)
   const selectedVehicle = user.vehicles.find((v) => v.id === user.selectedVehicleId) ?? user.vehicles[0]
@@ -168,9 +189,38 @@ export function WelcomeDashboard({
       </div>
 
       {/* Find nearby stations */}
-      <button className="btn-secondary" onClick={() => navigate('/finder')} style={{ marginBottom: 10 }}>
+      <button className="btn-secondary" onClick={() => navigate('/finder')} style={{ marginBottom: 8 }}>
         All bays full? Find nearby stations →
       </button>
+
+      {/* Share + Feedback row */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <button
+          onClick={handleShare}
+          style={{
+            flex: 1, height: 38,
+            background: 'transparent', border: '0.5px solid rgba(29,158,117,0.3)',
+            borderRadius: 'var(--rads)', color: 'var(--teal)',
+            fontFamily: '"DM Sans", sans-serif', fontSize: 12, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          ↑ Share ChargeQ
+        </button>
+        <button
+          onClick={() => setShowFeedback(true)}
+          style={{
+            flex: 1, height: 38,
+            background: 'transparent', border: '0.5px solid rgba(29,158,117,0.3)',
+            borderRadius: 'var(--rads)', color: 'var(--teal)',
+            fontFamily: '"DM Sans", sans-serif', fontSize: 12, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+        >
+          ★ Leave feedback
+        </button>
+      </div>
+
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '16px 0 8px' }}>
         <div style={{ flex: 1, height: '0.5px', background: 'rgba(29,158,117,0.2)' }} />
         <div style={{ fontSize: 10, color: 'var(--teal)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>My Garage</div>
@@ -261,6 +311,14 @@ export function WelcomeDashboard({
       >
         Sign out
       </button>
+
+      {showFeedback && (
+        <FeedbackModal
+          role="driver"
+          siteKey={siteKey ?? undefined}
+          onClose={() => setShowFeedback(false)}
+        />
+      )}
     </div>
   )
 }

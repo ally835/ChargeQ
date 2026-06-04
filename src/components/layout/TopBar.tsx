@@ -1,6 +1,7 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAppStore } from '@/store/appStore'
+import { FeedbackModal } from '@/components/ui/FeedbackModal'
 
 interface TopBarProps {
   siteLabel?: string
@@ -8,9 +9,11 @@ interface TopBarProps {
 
 export function TopBar({ siteLabel }: TopBarProps) {
   const siteInfo = useAppStore((s) => s.siteInfo)
+  const siteKey = useAppStore((s) => s.siteKey)
   const appMode = useAppStore((s) => s.appMode)
   const navigate = useNavigate()
   const label = siteLabel ?? siteInfo.name
+  const [showFeedback, setShowFeedback] = useState(false)
 
   // 7-click Easter egg
   const clickCount = useRef(0)
@@ -104,33 +107,65 @@ export function TopBar({ siteLabel }: TopBarProps) {
       )}
 
       {appMode === 'admin' && (
-        <div
-          style={{
-            fontSize: 11,
-            color: 'var(--amber-t)',
-            padding: '3px 10px',
-            background: 'var(--al)',
-            border: '0.5px solid var(--ab)',
-            borderRadius: 20,
-          }}
-        >
-          ⚙ Site Manager
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => setShowFeedback(true)}
+            title="Leave feedback"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'rgba(240,239,232,0.4)', fontSize: 16, padding: '2px 4px', lineHeight: 1,
+            }}
+          >
+            ★
+          </button>
+          <div
+            style={{
+              fontSize: 11,
+              color: 'var(--amber-t)',
+              padding: '3px 10px',
+              background: 'var(--al)',
+              border: '0.5px solid var(--ab)',
+              borderRadius: 20,
+            }}
+          >
+            ⚙ Site Manager
+          </div>
         </div>
       )}
 
       {appMode === 'superadmin' && (
-        <div
-          style={{
-            fontSize: 11,
-            color: '#85B7EB',
-            padding: '3px 10px',
-            background: 'rgba(55,138,221,.15)',
-            border: '0.5px solid rgba(55,138,221,.4)',
-            borderRadius: 20,
-          }}
-        >
-          ⬡ ChargeQ HQ
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => setShowFeedback(true)}
+            title="Leave feedback"
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: 'rgba(240,239,232,0.4)', fontSize: 16, padding: '2px 4px', lineHeight: 1,
+            }}
+          >
+            ★
+          </button>
+          <div
+            style={{
+              fontSize: 11,
+              color: '#85B7EB',
+              padding: '3px 10px',
+              background: 'rgba(55,138,221,.15)',
+              border: '0.5px solid rgba(55,138,221,.4)',
+              borderRadius: 20,
+            }}
+          >
+            ⬡ ChargeQ HQ
+          </div>
         </div>
+      )}
+
+      {showFeedback && (
+        <FeedbackModal
+          role={appMode === 'superadmin' ? 'superadmin' : 'manager'}
+          siteKey={siteKey ?? undefined}
+          onClose={() => setShowFeedback(false)}
+        />
       )}
     </div>
   )

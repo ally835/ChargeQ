@@ -216,6 +216,37 @@ export function StationDetailPanel({ station, isJoined, onJoined, onClose }: Sta
           </div>
         )}
 
+        {/* Share */}
+        <button
+          onClick={async () => {
+            const url = window.location.origin
+            const text = `Charging at ${station.name} — find it on ChargeQ`
+            if (navigator.share) {
+              try { await navigator.share({ title: 'ChargeQ', text, url }) } catch { /* cancelled */ }
+            } else {
+              try {
+                await navigator.clipboard.writeText(`${text}\n${url}`)
+                toast('Link copied!')
+              } catch {
+                toast('Share not supported on this device.')
+              }
+            }
+          }}
+          style={{
+            width: '100%', height: 38,
+            background: 'transparent', color: 'var(--teal)',
+            border: '0.5px solid rgba(29,158,117,0.35)',
+            borderRadius: 'var(--rads)',
+            fontFamily: '"DM Sans", sans-serif', fontSize: 12,
+            cursor: 'pointer', marginBottom: 8, transition: 'background 0.2s',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}
+          onMouseOver={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--gl)' }}
+          onMouseOut={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+        >
+          ↑ Share this station
+        </button>
+
         {/* Navigation */}
         <button
           onClick={() => {
